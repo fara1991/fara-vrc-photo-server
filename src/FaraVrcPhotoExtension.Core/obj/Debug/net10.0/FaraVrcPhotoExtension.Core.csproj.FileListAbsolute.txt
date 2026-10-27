@@ -1,0 +1,12 @@
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\bin\Debug\net10.0\FaraVrcPhotoExtension.Core.deps.json
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\bin\Debug\net10.0\FaraVrcPhotoExtension.Core.dll
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\bin\Debug\net10.0\FaraVrcPhotoExtension.Core.pdb
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.GeneratedMSBuildEditorConfig.editorconfig
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.AssemblyInfoInputs.cache
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.AssemblyInfo.cs
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.csproj.CoreCompileInputs.cache
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.sourcelink.json
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.dll
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\refint\FaraVrcPhotoExtension.Core.dll
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\FaraVrcPhotoExtension.Core.pdb
+E:\Projects\fara\fara-vrc-photo-extension\src\FaraVrcPhotoExtension.Core\obj\Debug\net10.0\ref\FaraVrcPhotoExtension.Core.dll
