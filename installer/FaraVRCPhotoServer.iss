@@ -1,4 +1,4 @@
-; FaraVRCPhotoServer のセットアップ（Inno Setup 6）。build/publish.ps1 が、先に実行ファイルを dist\publish に作ってから、これをコンパイルする。
+﻿; FaraVRCPhotoServer のセットアップ（Inno Setup 6）。build/publish.ps1 が、先に実行ファイルを dist\publish に作ってから、これをコンパイルする。
 ; 手で動かすとき: ISCC.exe /DAppVersion=1.0.0 installer\FaraVRCPhotoServer.iss
 #define AppName "FaraVRCPhotoServer"
 #define AppExe "FaraVrcPhotoServer.exe"
@@ -17,7 +17,6 @@ AppPublisherURL=https://github.com/fara1991/fara-vrc-photo-server
 AppSupportURL=https://github.com/fara1991/fara-vrc-photo-server/issues
 ; 管理者の権限は要らない（現在のユーザーの AppData\Local\Programs に入る）
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
