@@ -62,6 +62,7 @@ public sealed class HistoryStore(string path)
         return history
             .Where(e => e.Type == HistoryEventTypes.Avatar && e.Time <= taken && taken - e.Time <= limit)
             .OrderByDescending(e => e.Time)
+            .ThenByDescending(e => e.AvatarId is not null)                                                  // 同じ時刻なら、ID が分かっているほうを使う（ID なしの先書きと、ID つきの確定が両方ある）
             .FirstOrDefault();
     }
 }

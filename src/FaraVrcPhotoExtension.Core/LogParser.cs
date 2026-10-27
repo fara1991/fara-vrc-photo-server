@@ -76,6 +76,9 @@ public sealed partial class LogParser(string displayName, TimeZoneInfo? zone = n
         return events;
     }
 
+    /// <summary>ID を待っている切り替え（ID なしの形）。待っているものが無ければ null。状態は変えない（常駐して読み続けるとき、写真の直前の切り替えを先に使えるように）。</summary>
+    public HistoryEvent? PendingAvatar() => _pendingSwitch is { } p ? HistoryEvent.Avatar(p.Time, p.Name, null) : null;
+
     /// <summary>ログの終わり。ID を待っている切り替えを、ID なしで確定する。</summary>
     public IReadOnlyList<HistoryEvent> Flush()
     {
