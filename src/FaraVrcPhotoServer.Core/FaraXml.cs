@@ -3,7 +3,7 @@ using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>写真に追記するアバターの情報（docs/spec.md の第 5 節）。</summary>
 public sealed record FaraXmlInfo(string AvatarName, string? AvatarId, string Source = "log");

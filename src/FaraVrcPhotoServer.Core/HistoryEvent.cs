@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>履歴の種類（docs/spec.md の第 4 節）。</summary>
 public static class HistoryEventTypes

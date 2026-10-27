@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>
 /// VRChat のログのフォルダを、追記された分だけ読み続ける（<see cref="Poll"/> を定期的に呼ぶ）。

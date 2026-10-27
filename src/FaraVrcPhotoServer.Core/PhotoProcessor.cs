@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>写真の処理の設定（docs/spec.md の第 7 節）。</summary>
 public sealed record PhotoOptions(bool WriteXmp = true, string? BackupFolder = null);

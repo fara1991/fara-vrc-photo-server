@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>PNG の 1 チャンク（種類 4 文字と、本体。長さと CRC は書き出すときに付ける）。</summary>
 public sealed record PngChunk(string Type, byte[] Data);

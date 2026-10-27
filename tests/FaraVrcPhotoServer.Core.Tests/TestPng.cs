@@ -1,8 +1,8 @@
 using System.IO.Compression;
 using System.Text;
-using FaraVrcPhotoExtension;
+using FaraVrcPhotoServer;
 
-namespace FaraVrcPhotoExtension.Core.Tests;
+namespace FaraVrcPhotoServer.Core.Tests;
 
 /// <summary>テスト用の小さな PNG を作る。</summary>
 internal static class TestPng

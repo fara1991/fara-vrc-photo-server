@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>ログのフォルダを読んで、履歴に追記した結果。</summary>
 public sealed record ScanResult(int Files, int Events, int Added);

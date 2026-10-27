@@ -50,7 +50,7 @@ VRChat で写真を撮ったとき、**そのときに操作していたアバ�
 
 ## 4. 履歴ファイル
 
-- 場所: `%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl`（1 行 1 イベントの JSON。追記のみ。壊れた行は読み飛ばす）。
+- 場所: `%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl`（1 行 1 イベントの JSON。追記のみ。壊れた行は読み飛ばす）。
 - 時刻は、ISO 8601 のオフセットつき（例: `2026-10-28T01:49:51+09:00`）。
 
 ```json
@@ -95,14 +95,14 @@ faraxml:Source="log"
 
 ## 7. 設定（このソフト）
 
-`%LOCALAPPDATA%\FaraVrcPhotoExtension\settings.json`。
+`%LOCALAPPDATA%\FaraVrcPhotoServer\settings.json`。
 
 | 項目 | 既定 | 内容 |
 | --- | --- | --- |
 | `displayName` | 空 | 自分の VRChat の表示名。空のあいだは何も記録しない |
 | `photoFolder` | ユーザーの「ピクチャ」の下の `VRChat` | 写真を見張るフォルダ |
 | `logFolder` | `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` | VRChat のログのフォルダ |
-| `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl` | 履歴ファイル |
+| `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl` | 履歴ファイル |
 | `writeXmp` | `true` | 写真に追記するか |
 | `backupFolder` | 空 | 書く前の元のファイルのコピー先（空ならコピーしない） |
 | `autoStart` | `false` | Windows の起動時に自動で起動するか |
@@ -136,7 +136,7 @@ faraxml:Source="log"
 
 ## 11. 常駐ソフト（E3）
 
-- **構成**: `FaraVrcPhotoExtension.App`（WinForms のタスクトレイ。画面だけ）と、処理の本体 `ExtensionService`（Core。画面なしでテストできる）。
+- **構成**: `FaraVrcPhotoServer.App`（WinForms のタスクトレイ。画面だけ）と、処理の本体 `PhotoServerService`（Core。画面なしでテストできる）。
 - **起動**: 同じ PC で 2 つ動かさない（2 つ目は何もしない）。設定の表示名が空（初回）のときは、設定の画面を開く。設定に問題（表示名が空・フォルダが無い）があるときは、動かさず、トレイの状態に理由を出す。
 - **ログの読み続け**（`LogTailer`）: 2 秒ごとに、追記された分だけを読む（ファイルごとに読んだ位置を持つ。行の途中までなら、次の回に続きを読む。ログが短くなったら先頭から）。写真を処理する直前にも読む。
 - **ID を待っている切り替えは、ID なしで先に履歴に書く**（写真が、切り替えの直後に撮られても、アバターが分かるように）。ID が分かったら、ID つきを追記する。同じ時刻なら、**ID つきを使う**（`AvatarAt`）。

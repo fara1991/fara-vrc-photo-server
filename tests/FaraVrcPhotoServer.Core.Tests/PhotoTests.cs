@@ -1,11 +1,11 @@
 using System.IO.Compression;
 using System.Text;
 using System.Xml.Linq;
-using FaraVrcPhotoExtension;
+using FaraVrcPhotoServer;
 using Xunit;
-using static FaraVrcPhotoExtension.Core.Tests.TestPng;
+using static FaraVrcPhotoServer.Core.Tests.TestPng;
 
-namespace FaraVrcPhotoExtension.Core.Tests;
+namespace FaraVrcPhotoServer.Core.Tests;
 
 /// <summary>写真（PNG）の読み書き・XMP への追記・撮影日時からのアバターの当てはめ・見張り。実際の写真は使わず、小さな PNG を作って確かめる。</summary>
 public sealed class PhotoTests : IDisposable

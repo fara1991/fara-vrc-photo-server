@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>
 /// VRChat のログ（output_log_*.txt）の行から、ワールドとアバターのイベントを取り出す（docs/spec.md の第 3 節）。

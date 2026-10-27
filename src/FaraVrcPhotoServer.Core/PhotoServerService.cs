@@ -1,11 +1,11 @@
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>
 /// 常駐ソフトの本体（画面なし）: ログを読み続けて履歴に残し、写真フォルダを見張って、新しい写真にアバターを追記する。
 /// 設定が足りない・おかしいときは動かさず、理由を <see cref="Status"/> に出す。画面側は、設定を変えたら作り直す。
 /// 状態と最近の処理（<see cref="Recent"/>）は、画面（トレイ）に出す文。表示名は出さない。
 /// </summary>
-public sealed class ExtensionService : IDisposable
+public sealed class PhotoServerService : IDisposable
 {
     public static readonly TimeSpan LogPollInterval = TimeSpan.FromSeconds(2);
     private const int MaxRecent = 50;
@@ -20,7 +20,7 @@ public sealed class ExtensionService : IDisposable
     private Timer? _timer;
     private string _status = "停止中";
 
-    public ExtensionService(AppSettings settings, TimeZoneInfo? zone = null)
+    public PhotoServerService(AppSettings settings, TimeZoneInfo? zone = null)
     {
         _settings = settings;
         _zone = zone;

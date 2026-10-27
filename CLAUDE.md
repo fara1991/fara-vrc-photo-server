@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-fara-vrc-photo-extension。VRChat のログを監視し、写真ができたときに、そのときのアバターの情報を写真の XMP に追記する、Windows 用の常駐ソフト（.NET 10 の予定）。読み取り側は fara-vrc-photo-album（デスクトップアプリ）。詳しい取り決めは docs/spec.md。
+fara-vrc-photo-server。VRChat のログを監視し、写真ができたときに、そのときのアバターの情報を写真の XMP に追記する、Windows 用の常駐ソフト（.NET 10 の予定）。読み取り側は fara-vrc-photo-album（デスクトップアプリ）。詳しい取り決めは docs/spec.md。
 
 ## ブランチ運用（必ず守る）
 

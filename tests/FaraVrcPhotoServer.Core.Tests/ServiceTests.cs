@@ -1,9 +1,9 @@
 using System.Text;
-using FaraVrcPhotoExtension;
+using FaraVrcPhotoServer;
 using Xunit;
-using static FaraVrcPhotoExtension.Core.Tests.TestPng;
+using static FaraVrcPhotoServer.Core.Tests.TestPng;
 
-namespace FaraVrcPhotoExtension.Core.Tests;
+namespace FaraVrcPhotoServer.Core.Tests;
 
 /// <summary>設定・ログの読み続け・常駐の本体（実際の VRChat やタスクトレイは使わない）。</summary>
 public sealed class ServiceTests : IDisposable
@@ -113,7 +113,7 @@ public sealed class ServiceTests : IDisposable
     [Fact]
     public void TheServiceDoesNotStartWithoutAUsableSettingAndSaysWhy()
     {
-        using var service = new ExtensionService(Settings(Dir("p0"), Dir("l0"), name: ""), Jst);
+        using var service = new PhotoServerService(Settings(Dir("p0"), Dir("l0"), name: ""), Jst);
         Assert.False(service.Start());
         Assert.False(service.IsRunning);
         Assert.Contains("表示名が未設定", service.Status);
@@ -126,7 +126,7 @@ public sealed class ServiceTests : IDisposable
         var logs = Dir("logs3");
         var log = Path.Combine(logs, "output_log_2026-10-28_01-30-36.txt");
         Append(log, Line("01:49:51", $"[Behaviour] Switching {Me} to avatar FaraFrillBlood") + "\n" + Line("01:49:53", $"Loading Avatar Data:{Avatar1}") + "\n");
-        using var service = new ExtensionService(Settings(photos, logs), Jst);
+        using var service = new PhotoServerService(Settings(photos, logs), Jst);
         Assert.True(service.Start());
         Assert.True(service.IsRunning);
 
@@ -154,7 +154,7 @@ public sealed class ServiceTests : IDisposable
         var photos = Dir("photos4");
         var logs = Dir("logs4");
         Append(Path.Combine(logs, "output_log_2026-10-28_01-30-36.txt"), Line("01:49:51", $"[Behaviour] Switching {Me} to avatar Mine") + "\n");
-        using var service = new ExtensionService(Settings(photos, logs, writeXmp: false), Jst);
+        using var service = new PhotoServerService(Settings(photos, logs, writeXmp: false), Jst);
         Assert.True(service.Start());
         var path = Path.Combine(photos, "VRChat_2026-10-28_01-55-05.000_8x6.png");
         var bytes = MakePng();

@@ -1,11 +1,11 @@
 using System.Text.Json;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>アプリ名（画面に出す名前。名前を変えるときは、ここと、画面の文だけ）。</summary>
 public static class AppInfo
 {
-    public const string Name = "Fara VRC Photo Extension";
+    public const string Name = "FaraVRCPhotoServer";
 }
 
 /// <summary>
@@ -65,7 +65,7 @@ public sealed class SettingsStore(string path)
     public string Path { get; } = path;
 
     public static string DefaultPath =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FaraVrcPhotoExtension", "settings.json");
+        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FaraVrcPhotoServer", "settings.json");
 
     public AppSettings Load()
     {

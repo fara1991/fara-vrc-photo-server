@@ -1,4 +1,4 @@
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>写真への追記の結果。</summary>
 public enum WriteOutcome

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>
 /// 履歴ファイル（history.jsonl。1 行 1 イベント）。追記のみ。壊れた行は読み飛ばす。
@@ -10,9 +10,9 @@ public sealed class HistoryStore(string path)
 {
     public string Path { get; } = path;
 
-    /// <summary>履歴の既定の場所（%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl）。</summary>
+    /// <summary>履歴の既定の場所（%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl）。</summary>
     public static string DefaultPath =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FaraVrcPhotoExtension", "history.jsonl");
+        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FaraVrcPhotoServer", "history.jsonl");
 
     /// <summary>履歴を時刻順に読む。ファイルが無い・読めない行は、空・読み飛ばし。</summary>
     public IReadOnlyList<HistoryEvent> Load()
