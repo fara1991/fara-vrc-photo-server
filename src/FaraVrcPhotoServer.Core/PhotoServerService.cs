@@ -104,7 +104,7 @@ public sealed class PhotoServerService : IDisposable
                 Note(line);
             });
             _watcher = watcher;
-            SetStatus("写真のフォルダを見張っています");
+            SetStatus("サーバ起動中です");
             AppLog.Write("写真のフォルダの見張りを始めました");
         }
         catch (Exception e) when (e is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)

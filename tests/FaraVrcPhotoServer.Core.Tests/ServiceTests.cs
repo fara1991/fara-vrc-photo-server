@@ -215,7 +215,7 @@ public sealed class ServiceTests : IDisposable
         for (var i = 0; i < 100 && !service.IsRunning; i++) await Task.Delay(50);
 
         Assert.True(service.IsRunning);
-        Assert.Equal("写真のフォルダを見張っています", service.Status);
+        Assert.Equal("サーバ起動中です", service.Status);
         Assert.True(attempts >= 3);
         var log = File.ReadAllText(AppLog.Path);
         Assert.Contains("写真のフォルダの見張り", log);
