@@ -4,27 +4,39 @@ namespace FaraVrcPhotoServer;
 /// 常駐ソフトの本体（画面なし）: ログを読み続けて履歴に残し、写真フォルダを見張って、新しい写真にアバターを追記する。
 /// 設定が足りない・おかしいときは動かさず、理由を <see cref="Status"/> に出す。画面側は、設定を変えたら作り直す。
 /// 状態と最近の処理（<see cref="Recent"/>）は、画面（トレイ）に出す文。表示名は出さない。
+/// <b>写真のフォルダを見張り始められなかったときも、落ちない</b>: 理由を状態に出し、一定の間隔でやり直す（ログの読み続けは、そのあいだも動く）。
 /// </summary>
 public sealed class PhotoServerService : IDisposable
 {
-    public static readonly TimeSpan LogPollInterval = TimeSpan.FromSeconds(2);
     private const int MaxRecent = 50;
 
     private readonly AppSettings _settings;
     private readonly TimeZoneInfo? _zone;
+    private readonly Func<string, Action<string>, IDisposable> _startWatching;
     private readonly object _gate = new();
     private readonly List<string> _recent = [];
     private HistoryStore? _history;
     private LogTailer? _tailer;
-    private PhotoWatcher? _watcher;
+    private PhotoProcessor? _processor;
+    private IDisposable? _watcher;
     private Timer? _timer;
+    private DateTime _lastWatchAttempt;
     private string _status = "停止中";
+    private bool _disposed;
 
-    public PhotoServerService(AppSettings settings, TimeZoneInfo? zone = null)
+    /// <param name="startWatching">写真のフォルダの見張りを始める（テストが、失敗する版に差し替える）。</param>
+    public PhotoServerService(AppSettings settings, TimeZoneInfo? zone = null, Func<string, Action<string>, IDisposable>? startWatching = null)
     {
         _settings = settings;
         _zone = zone;
+        _startWatching = startWatching ?? ((folder, onPhoto) => new PhotoWatcher(folder, onPhoto));
     }
+
+    /// <summary>ログを読む間隔。</summary>
+    public TimeSpan LogPollInterval { get; init; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>写真のフォルダを見張れなかったときの、やり直しの間隔。</summary>
+    public TimeSpan RetryInterval { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>状態の変化（状態の文・最近の処理が変わったとき）。呼ばれるスレッドは決まっていない。</summary>
     public event Action? Changed;
@@ -35,6 +47,7 @@ public sealed class PhotoServerService : IDisposable
         get { lock (_gate) return _status; }
     }
 
+    /// <summary>写真のフォルダを見張っているか。</summary>
     public bool IsRunning => _watcher is not null;
 
     /// <summary>最近の処理（新しいものが最後）。</summary>
@@ -43,7 +56,7 @@ public sealed class PhotoServerService : IDisposable
         get { lock (_gate) return _recent.ToList(); }
     }
 
-    /// <summary>始める。設定に問題があれば動かさず、false（理由は <see cref="Status"/>）。</summary>
+    /// <summary>始める。設定に問題があれば動かさず、false（理由は <see cref="Status"/>）。見張りを始められなくても true（やり直す）。</summary>
     public bool Start()
     {
         var problems = _settings.Problems();
@@ -54,23 +67,58 @@ public sealed class PhotoServerService : IDisposable
         }
         _history = new HistoryStore(_settings.EffectiveHistoryPath);
         _tailer = new LogTailer(_settings.EffectiveLogFolder, _settings.DisplayName, _history, _zone);
-        var first = _tailer.Poll();                                                                           // 今あるログを、先頭から読む（履歴に無い分だけ追記）
-        Note($"ログを読みました（履歴に {first} 件を追記）");
+        try
+        {
+            Note($"ログを読みました（履歴に {_tailer.Poll()} 件を追記）");                                       // 今あるログを、先頭から読む（履歴に無い分だけ追記）
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Write("ログの読み込み", e);
+            Note("ログを読めませんでした（あとでやり直します）: " + e.Message);
+        }
 
-        var processor = new PhotoProcessor(() =>
+        _processor = new PhotoProcessor(() =>
         {
             Poll();                                                                                           // 写真の処理の前に、ログの最新の分を読む
             return _history.Load();
         }, new PhotoOptions(_settings.WriteXmp, _settings.BackupFolder is { Length: > 0 } b ? b : null), _zone);
-        _watcher = new PhotoWatcher(_settings.EffectivePhotoFolder, path =>
-        {
-            var result = processor.Process(path);
-            _watcher?.IgnoreForAWhile(path);
-            Note($"{Path.GetFileName(path)}: {Describe(result)}");
-        });
-        _timer = new Timer(_ => Poll(), null, LogPollInterval, LogPollInterval);
-        SetStatus("写真のフォルダを見張っています");
+
+        TryStartWatching();
+        _timer = new Timer(_ => Tick(), null, LogPollInterval, LogPollInterval);
         return true;
+    }
+
+    /// <summary>写真のフォルダの見張りを始める。失敗しても落とさず、状態に理由を出す。</summary>
+    private void TryStartWatching()
+    {
+        _lastWatchAttempt = DateTime.UtcNow;
+        try
+        {
+            IDisposable? watcher = null;
+            watcher = _startWatching(_settings.EffectivePhotoFolder, path =>
+            {
+                var result = _processor!.Process(path);
+                (watcher as PhotoWatcher)?.IgnoreForAWhile(path);
+                var line = $"{Path.GetFileName(path)}: {Describe(result)}";
+                AppLog.Write(line);
+                Note(line);
+            });
+            _watcher = watcher;
+            SetStatus("写真のフォルダを見張っています");
+            AppLog.Write("写真のフォルダの見張りを始めました");
+        }
+        catch (Exception e) when (e is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            AppLog.Write("写真のフォルダの見張り", e);
+            SetStatus($"写真のフォルダを見張れません（{(int)RetryInterval.TotalSeconds} 秒ごとにやり直します）: {e.Message}");
+        }
+    }
+
+    private void Tick()
+    {
+        if (_disposed) return;
+        Poll();
+        if (_watcher is null && DateTime.UtcNow - _lastWatchAttempt >= RetryInterval) TryStartWatching();
     }
 
     private void Poll()
@@ -116,6 +164,7 @@ public sealed class PhotoServerService : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _timer?.Dispose();
         _watcher?.Dispose();
         _timer = null;

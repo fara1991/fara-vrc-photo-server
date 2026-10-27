@@ -100,7 +100,7 @@ faraxml:Source="log"
 | 項目 | 既定 | 内容 |
 | --- | --- | --- |
 | `displayName` | 空 | 自分の VRChat の表示名。空のあいだは何も記録しない |
-| `photoFolder` | ユーザーの「ピクチャ」の下の `VRChat` | 写真を見張るフォルダ |
+| `photoFolder` | ユーザーの「ピクチャ」の下の `VRChat` | 写真を見張るフォルダ（**画面には出さない**。ほとんどの人が同じ場所で、入力が要らないため。テスト・特別な環境のための項目） |
 | `logFolder` | `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` | VRChat のログのフォルダ |
 | `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl` | 履歴ファイル |
 | `writeXmp` | `true` | 写真に追記するか |

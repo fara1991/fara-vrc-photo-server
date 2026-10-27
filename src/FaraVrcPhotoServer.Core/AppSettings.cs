@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FaraVrcPhotoServer;
 
@@ -17,7 +18,7 @@ public sealed record AppSettings
     /// <summary>自分の VRChat の表示名。空のあいだは、何も記録しない。</summary>
     public string DisplayName { get; init; } = "";
 
-    /// <summary>写真を見張るフォルダ。空なら、ユーザーの「ピクチャ」の下の VRChat。</summary>
+    /// <summary>写真を見張るフォルダ。空なら、ユーザーの「ピクチャ」の下の VRChat（VRChat の既定の保存先。みんな同じなので、設定の画面には出さない。テスト・特別な環境のための項目）。</summary>
     public string PhotoFolder { get; init; } = "";
 
     /// <summary>VRChat のログのフォルダ。空なら、既定の場所。</summary>
@@ -35,10 +36,13 @@ public sealed record AppSettings
     /// <summary>Windows の起動時に自動で起動するか。</summary>
     public bool AutoStart { get; init; }
 
+    [JsonIgnore]
     public string EffectivePhotoFolder => PhotoFolder.Trim() is { Length: > 0 } p ? p : PhotoNaming.DefaultPhotoFolder;
 
+    [JsonIgnore]
     public string EffectiveLogFolder => LogFolder.Trim() is { Length: > 0 } p ? p : LogScanner.DefaultLogFolder;
 
+    [JsonIgnore]
     public string EffectiveHistoryPath => HistoryPath.Trim() is { Length: > 0 } p ? p : HistoryStore.DefaultPath;
 
     /// <summary>動かすのに足りない・おかしい点（無ければ空）。</summary>

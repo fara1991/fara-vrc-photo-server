@@ -56,4 +56,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} を起動する"; Flags: nowait postinstall skipifsilent
 
-; 設定と履歴（%LOCALAPPDATA%\FaraVrcPhotoServer）は、利用者のデータなので、アンインストールでは消さない
+[UninstallDelete]
+; アンインストールでは、アプリが作ったデータ（設定・履歴・記録。%LOCALAPPDATA%\FaraVrcPhotoServer）も、まとめて消す。
+; 利用者が選んだフォルダ（元の写真の控えのフォルダなど）は、写真が入っているので、消さない
+Type: filesandordirs; Name: "{localappdata}\FaraVrcPhotoServer"

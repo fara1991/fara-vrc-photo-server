@@ -18,7 +18,8 @@
 
 - 写真のフォルダ（既定は、ピクチャの下の `VRChat`）に新しい写真ができると、そのときのアバターを写真に追記します。
 - アイコンのメニュー: 状態／設定／最近の処理／写真のフォルダを開く／履歴のフォルダを開く／終了。
-- 設定と履歴は `%LOCALAPPDATA%\FaraVrcPhotoServer\`（`settings.json`・`history.jsonl`）に置きます。アンインストールしても消えません。
+- 設定・履歴・記録は `%LOCALAPPDATA%\FaraVrcPhotoServer\`（`settings.json`・`history.jsonl`・`app.log`）に置きます。**アンインストールすると、このフォルダもまとめて消えます**（元の写真の控えのフォルダなど、自分で選んだフォルダは、写真が入っているので消しません）。
+- 写真のフォルダは、ピクチャの下の `VRChat` に決まっています（設定の画面には出しません）。見張りを始められないときは、トレイの状態に理由を出して、10 秒ごとにやり直します。
 - 写真に書くのは、`faraxml` の項目（アバター名・ID）だけで、元の XMP は変えません。すでに `faraxml` の項目がある写真は、書き換えません。
 
 ## 配布物を作る（開発者向け）
@@ -30,6 +31,12 @@ powershell -File build/publish.ps1
 - `dist\publish\FaraVrcPhotoServer.exe` … .NET のランタイムを含む、単体の実行ファイル（約 50 MB）
 - `dist\FaraVRCPhotoServer-Setup-<版>.exe` … セットアップ（約 45 MB。[Inno Setup 6](https://jrsoftware.org/isinfo.php) が要ります。`winget install JRSoftware.InnoSetup`）
 - 版は、`src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj` の `<Version>`。セットアップの定義は `installer/FaraVRCPhotoServer.iss`。
+
+### リリース（GitHub Actions）
+
+- `master` にマージ（develop → master の PR）すると、`.github/workflows/release.yml` が、テスト → インストーラーのビルド → **版と同じタグ（`v1.0.0` など）の Release** を作って、インストーラーを載せます。
+- Release には、前のリリースから取り込んだ変更（マージした PR の題）と、インストールの手順が書かれます（`build/release-notes.ps1`）。
+- **版の上げ方**: リリースしたあとにアプリを変えるときは、develop の PR で `<Version>` を上げます（機能の追加は 1.1.0、修正は 1.0.1 のように）。同じ版のタグがすでにあると、master への PR（`src`・`installer`・`build` の変更）は、Actions が止めます。版を上げていない push では、新しい Release は作りません（上書きしません）。
 - アイコン（`src/FaraVrcPhotoServer.App/app.ico`）を作り直すとき: `dotnet run --project src/FaraVrcPhotoServer.App -- --write-icon src/FaraVrcPhotoServer.App/app.ico`
 
 開発中に、ビルドして動かすとき: `dotnet run --project src/FaraVrcPhotoServer.App`
