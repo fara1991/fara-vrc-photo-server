@@ -8,4 +8,18 @@ VRChatのログを監視し、写真を撮ってファイルが作成された�
 - 動作環境: Windows（.NET 10 のタスクトレイの常駐ソフトの予定）
 - VRChat 本体への改造・注入は行いません。ログの読み取り・写真フォルダの見張り・写真ファイルへの追記だけです（任意で OSC の受信）。
 
-状況: 仕様の段階です（実装はこれから）。
+状況: E1（ログの読み取りと履歴）まで実装済み。写真への追記（E2）以降はこれからです。
+
+## 使い方（E1・確認用の CLI）
+
+```powershell
+dotnet run --project src/FaraVrcPhotoExtension.Cli -- scan --name "<自分の VRChat の表示名>"
+dotnet run --project src/FaraVrcPhotoExtension.Cli -- show
+dotnet run --project src/FaraVrcPhotoExtension.Cli -- show --at "2026-10-28 01:50:00"
+```
+
+VRChat のログ（約 1 日で消える）を読んで、`%LOCALAPPDATA%FaraVrcPhotoExtensionhistory.jsonl` に追記します（同じイベントは二重に書きません）。表示名は、ログから自分の行を選ぶためにだけ使い、履歴には書きません。
+
+```powershell
+dotnet test
+```
