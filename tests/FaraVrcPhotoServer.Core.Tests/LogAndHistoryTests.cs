@@ -1,14 +1,14 @@
-using FaraVrcPhotoExtension;
+using FaraVrcPhotoServer;
 using Xunit;
 
-namespace FaraVrcPhotoExtension.Core.Tests;
+namespace FaraVrcPhotoServer.Core.Tests;
 
 /// <summary>ログの読み取りと履歴（実ログの行の形を、架空の名前で再現して確かめる）。</summary>
 public sealed class LogAndHistoryTests : IDisposable
 {
     private static readonly TimeZoneInfo Jst = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");
     private const string Me = "テスト／Me";
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-vrcext-" + Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-vrcserver-" + Guid.NewGuid().ToString("N")[..8]);
 
     public void Dispose()
     {

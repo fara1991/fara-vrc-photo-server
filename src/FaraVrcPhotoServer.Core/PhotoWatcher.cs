@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-namespace FaraVrcPhotoExtension;
+namespace FaraVrcPhotoServer;
 
 /// <summary>
 /// 写真のフォルダ（サブフォルダを含む）の新しい PNG を見張る。ファイルができた直後は VRChat が書き込み中のことがあるので、

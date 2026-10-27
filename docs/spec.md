@@ -50,7 +50,7 @@ VRChat で写真を撮ったとき、**そのときに操作していたアバ�
 
 ## 4. 履歴ファイル
 
-- 場所: `%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl`（1 行 1 イベントの JSON。追記のみ。壊れた行は読み飛ばす）。
+- 場所: `%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl`（1 行 1 イベントの JSON。追記のみ。壊れた行は読み飛ばす）。
 - 時刻は、ISO 8601 のオフセットつき（例: `2026-10-28T01:49:51+09:00`）。
 
 ```json
@@ -95,14 +95,14 @@ faraxml:Source="log"
 
 ## 7. 設定（このソフト）
 
-`%LOCALAPPDATA%\FaraVrcPhotoExtension\settings.json`。
+`%LOCALAPPDATA%\FaraVrcPhotoServer\settings.json`。
 
 | 項目 | 既定 | 内容 |
 | --- | --- | --- |
 | `displayName` | 空 | 自分の VRChat の表示名。空のあいだは何も記録しない |
 | `photoFolder` | ユーザーの「ピクチャ」の下の `VRChat` | 写真を見張るフォルダ |
 | `logFolder` | `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` | VRChat のログのフォルダ |
-| `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl` | 履歴ファイル |
+| `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoServer\history.jsonl` | 履歴ファイル |
 | `writeXmp` | `true` | 写真に追記するか |
 | `backupFolder` | 空 | 書く前の元のファイルのコピー先（空ならコピーしない） |
 | `autoStart` | `false` | Windows の起動時に自動で起動するか |
@@ -121,7 +121,7 @@ faraxml:Source="log"
 | E0 | この仕様（今） |
 | E1 | ログの読み取り・履歴（テストつき。実ログの形の行で検証） |
 | E2 | 写真の見張りと XMP の書き込み（検査・入れ替え。壊れた写真・書き込み中の写真のテスト） |
-| E3 | タスクトレイ・設定の画面・自動起動 |
+| E3 | タスクトレイ・設定の画面・自動起動（実装済み。下の第 11 節） |
 | E4 | fara-vrc-photo-album 側の読み取り（第 6 節） |
 | E5（任意） | OSC の受信（服の番号のパラメーターなど） |
 
@@ -133,3 +133,14 @@ faraxml:Source="log"
 - ワールドに入った直後のアバターの切り替えが、すべてログに出るか（出ない場合は、直前のワールドの行の後の最初の `avatar` を使う）。
 - 写真のファイル名の日時と、ログの時刻のずれ（同じ PC のローカル時刻のはずだが、秒の丸めで 1 秒ほどずれるか）。
 - XMP の書き込みで、VRChat 以外のビューア（Windows の「写真」・Twitter など）が問題なく開けるか。
+
+## 11. 常駐ソフト（E3）
+
+- **構成**: `FaraVrcPhotoServer.App`（WinForms のタスクトレイ。画面だけ）と、処理の本体 `PhotoServerService`（Core。画面なしでテストできる）。
+- **起動**: 同じ PC で 2 つ動かさない（2 つ目は何もしない）。設定の表示名が空（初回）のときは、設定の画面を開く。設定に問題（表示名が空・フォルダが無い）があるときは、動かさず、トレイの状態に理由を出す。
+- **ログの読み続け**（`LogTailer`）: 2 秒ごとに、追記された分だけを読む（ファイルごとに読んだ位置を持つ。行の途中までなら、次の回に続きを読む。ログが短くなったら先頭から）。写真を処理する直前にも読む。
+- **ID を待っている切り替えは、ID なしで先に履歴に書く**（写真が、切り替えの直後に撮られても、アバターが分かるように）。ID が分かったら、ID つきを追記する。同じ時刻なら、**ID つきを使う**（`AvatarAt`）。
+- **トレイのメニュー**: 状態（見張り中・足りない設定）／設定／最近の処理（新しいものが上。最大 50 件）／写真のフォルダを開く／履歴のフォルダを開く／終了。アイコンの文字（ツールチップ）は、最後の処理。表示名は、どの画面にも出さない。
+- **設定の画面**: 表示名・写真のフォルダ・ログのフォルダ・履歴ファイル・元の写真の控えのフォルダ・「写真に追記する」・「Windows の起動時に自動で起動する」。保存したら、常駐の本体を作り直す。空のフォルダ・ファイルの欄は、既定を使う（欄の下に既定を出す）。
+- **自動起動**: 現在のユーザーの `Run` キー（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）に、実行ファイルを登録する。管理者の権限は要らない。オフにすると、登録を消す。
+- **名前**: 画面に出すアプリ名は `AppInfo.Name`（Core）の 1 か所。名前を変えるときは、ここと、実行ファイル名・README だけ。

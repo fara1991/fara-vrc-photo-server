@@ -1,10 +1,10 @@
-using FaraVrcPhotoExtension;
+using FaraVrcPhotoServer;
 
 // 手元の確認用 CLI（常駐ソフト本体は E3 で作る）。
-//   vrcext scan --name <自分の VRChat の表示名> [--logs <ログのフォルダ>] [--history <history.jsonl>]   ログを読んで履歴に追記する
-//   vrcext show [--history <history.jsonl>] [--at "yyyy-MM-dd HH:mm:ss"]                               履歴を表示する（--at で、その時刻のアバター）
-//   vrcext tag <写真.png ...> [--history <history.jsonl>] [--backup <フォルダ>] [--dry-run]              写真に、撮影日時のアバターを追記する（--dry-run は書かない）
-//   vrcext watch --name <表示名> [--photos <フォルダ>] [--logs <フォルダ>] [--history <ファイル>] [--backup <フォルダ>] [--no-xmp]
+//   vrcserver scan --name <自分の VRChat の表示名> [--logs <ログのフォルダ>] [--history <history.jsonl>]   ログを読んで履歴に追記する
+//   vrcserver show [--history <history.jsonl>] [--at "yyyy-MM-dd HH:mm:ss"]                               履歴を表示する（--at で、その時刻のアバター）
+//   vrcserver tag <写真.png ...> [--history <history.jsonl>] [--backup <フォルダ>] [--dry-run]              写真に、撮影日時のアバターを追記する（--dry-run は書かない）
+//   vrcserver watch --name <表示名> [--photos <フォルダ>] [--logs <フォルダ>] [--history <ファイル>] [--backup <フォルダ>] [--no-xmp]
 //                                                                                                       写真フォルダを見張り、新しい写真に追記する（Ctrl+C で終了）
 // 表示名は、履歴・写真・出力のどれにも出さない（ログから自分の行を選ぶためにだけ使う）。
 
@@ -124,6 +124,6 @@ switch (positional.FirstOrDefault())
         return 0;
     }
     default:
-        Console.Error.WriteLine("使い方: vrcext scan|show|tag|watch（先頭のコメントを参照）");
+        Console.Error.WriteLine("使い方: vrcserver scan|show|tag|watch（先頭のコメントを参照）");
         return 2;
 }
