@@ -36,14 +36,9 @@ public sealed class PhotoWatcher : IDisposable
     private static FileSystemWatcher StartWatching(string folder, Action<string> enqueue)
     {
         var candidates = new List<string> { folder };
-        try
-        {
-            if (new DirectoryInfo(folder).ResolveLinkTarget(returnFinalTarget: true) is { } target && target.Exists) candidates.Add(target.FullName);
-        }
-        catch (IOException)
-        {
-            // リンクでない・先が読めない。そのときは、元のフォルダだけ
-        }
+        // リンク（ジャンクション）の先も、あとの候補にする。Windows は、管理者でない人が作ったジャンクションを「信頼されていないマウントポイント」として、
+        // たどれないことがある。そのときも、リンクをたどらずに先のパスを読んで、直接見張れる
+        if (ReparseTarget.TryGet(folder) is { } linked && Directory.Exists(linked)) candidates.Add(linked);
 
         var failures = new List<string>();
         foreach (var candidate in candidates)

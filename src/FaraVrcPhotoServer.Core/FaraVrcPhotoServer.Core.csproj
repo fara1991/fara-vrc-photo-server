@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ログの読み取り・履歴（Windows 以外でもテストできるよう、Windows 専用の部品は入れない） -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>FaraVrcPhotoServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FaraVrcPhotoServer.Core.Tests" />
+  </ItemGroup>
+
+</Project>
