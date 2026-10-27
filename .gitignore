@@ -115,3 +115,6 @@ bin.unix/
 obj.unix/
 *.user
 .vs/
+
+# 配布物（build/publish.ps1 の出力）
+dist/
