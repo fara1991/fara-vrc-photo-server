@@ -222,4 +222,56 @@ public sealed class ServiceTests : IDisposable
         Assert.Contains("見張りを始めました", log);
         Assert.DoesNotContain(Me, log);
     }
+
+    // ---------------------------------------------------------------- 元の写真を backup フォルダに残す
+
+    [Fact]
+    public async Task WithTheBackupOptionTheOriginalMovesToABackupFolderBesideThePhotoAndNothingIsTaggedTwice()
+    {
+        var photos = Dir("photos6");
+        var month = Directory.CreateDirectory(Path.Combine(photos, "2026-10")).FullName;
+        var logs = Dir("logs6");
+        Append(Path.Combine(logs, "output_log_2026-10-28_01-30-36.txt"), Line("01:49:51", $"[Behaviour] Switching {Me} to avatar Mine") + "\n");
+        using var service = new PhotoServerService(Settings(photos, logs) with { BackupOriginals = true }, Jst);
+        Assert.True(service.Start());
+        var path = Path.Combine(month, "VRChat_2026-10-28_01-55-05.000_8x6.png");
+        var original = MakePng();
+
+        await File.WriteAllBytesAsync(path, original);
+        for (var i = 0; i < 100 && !service.Recent.Any(r => r.Contains("追記しました")); i++) await Task.Delay(100);
+        await Task.Delay(2500);                                                                           // 控えの作成で起きるイベントを、処理していないか見る
+
+        var backup = Path.Combine(month, "backup", "VRChat_2026-10-28_01-55-05.000_8x6.png");
+        Assert.True(File.Exists(backup));
+        Assert.Equal(original, await File.ReadAllBytesAsync(backup));                                      // 控えは、書く前の元のまま
+        Assert.Contains("faraxml:AvatarName=\"Mine\"", Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path)));   // 元の場所には、タグを埋め込んだ写真
+        Assert.Single(Directory.EnumerateFiles(Path.Combine(month, "backup")));                            // 控えの控え（backup\backup）を作っていない
+        Assert.Equal(1, service.Recent.Count(r => r.Contains(".png")));                                    // 処理は 1 回だけ
+    }
+
+    [Fact]
+    public async Task TheWatcherIgnoresPhotosInsideABackupFolderButNotTheWatchedFoldersOwnName()
+    {
+        var parent = Dir("backup");                                                                        // 見張るフォルダの名前が backup でも、中の写真は見る
+        var watched = Directory.CreateDirectory(Path.Combine(parent, "VRChat")).FullName;
+        Directory.CreateDirectory(Path.Combine(watched, "2026-10", "Backup"));
+        var seen = new List<string>();
+        using var watcher = new PhotoWatcher(watched, p => { lock (seen) seen.Add(Path.GetFileName(p)); });
+
+        await File.WriteAllBytesAsync(Path.Combine(watched, "2026-10", "Backup", "VRChat_2026-10-28_01-55-01.000_8x6.png"), MakePng());
+        await File.WriteAllBytesAsync(Path.Combine(watched, "2026-10", "VRChat_2026-10-28_01-55-02.000_8x6.png"), MakePng());
+        for (var i = 0; i < 100 && seen.Count == 0; i++) await Task.Delay(100);
+        await Task.Delay(2000);
+
+        lock (seen) Assert.Equal(["VRChat_2026-10-28_01-55-02.000_8x6.png"], seen);
+    }
+
+    [Fact]
+    public void TheBackupOptionIsSavedWithTheSettingsAndOffByDefault()
+    {
+        Assert.False(new AppSettings().BackupOriginals);
+        var store = new SettingsStore(Path.Combine(_root, "s3", "settings.json"));
+        store.Save(new AppSettings { DisplayName = "名前", BackupOriginals = true });
+        Assert.True(store.Load().BackupOriginals);
+    }
 }

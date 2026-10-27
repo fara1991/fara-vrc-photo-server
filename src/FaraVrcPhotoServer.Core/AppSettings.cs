@@ -30,8 +30,11 @@ public sealed record AppSettings
     /// <summary>写真に追記するか（false なら履歴だけ）。</summary>
     public bool WriteXmp { get; init; } = true;
 
-    /// <summary>書く前の元の写真のコピー先。空ならコピーしない。</summary>
+    /// <summary>書く前の元の写真のコピー先（フォルダを決めて控える。CLI・特別な環境のための項目。画面には出さない）。空ならコピーしない。</summary>
     public string BackupFolder { get; init; } = "";
+
+    /// <summary>書く前の元の写真を、写真と同じ場所の backup フォルダに残すか（既定は残さない）。タグを埋め込んだ写真は、元の場所にそのまま置く。</summary>
+    public bool BackupOriginals { get; init; }
 
     /// <summary>Windows の起動時に自動で起動するか。</summary>
     public bool AutoStart { get; init; }

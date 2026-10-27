@@ -81,7 +81,7 @@ public sealed class PhotoServerService : IDisposable
         {
             Poll();                                                                                           // 写真の処理の前に、ログの最新の分を読む
             return _history.Load();
-        }, new PhotoOptions(_settings.WriteXmp, _settings.BackupFolder is { Length: > 0 } b ? b : null), _zone);
+        }, new PhotoOptions(_settings.WriteXmp, _settings.BackupFolder is { Length: > 0 } b ? b : null, _settings.BackupOriginals), _zone);
 
         TryStartWatching();
         _timer = new Timer(_ => Tick(), null, LogPollInterval, LogPollInterval);
