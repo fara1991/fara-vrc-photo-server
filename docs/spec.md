@@ -69,15 +69,15 @@ VRChat で写真を撮ったとき、**そのときに操作していたアバ�
 - 書き込み先: PNG の `iTXt` チャンク（キーワード `XML:com.adobe.xmp`）の、XMP の `rdf:Description` に、**独自の名前空間**の項目を足す。VRChat が書いた既存の項目（`vrc:` と `xmp:`）は、変えない。
 
 ```xml
-xmlns:faravrc="http://fara-labs.com/ns/vrcphoto/1.0/"
-faravrc:Version="1"
-faravrc:AvatarName="FaraFrillBlood"
-faravrc:AvatarId="avtr_71bd1202-157a-4264-b888-a133209de9ca"
-faravrc:Source="log"
+xmlns:faraxml="http://fara-labs.com/ns/faraxml/1.0/"
+faraxml:Version="1"
+faraxml:AvatarName="FaraFrillBlood"
+faraxml:AvatarId="avtr_71bd1202-157a-4264-b888-a133209de9ca"
+faraxml:Source="log"
 ```
 
 - `AvatarId` は、分かったときだけ。`Source` は、取り出した方法（`log` または、後で足す `osc`）。
-- **すでに `faravrc:` の項目がある写真は、書き換えない**（二重に書かない）。
+- **すでに `faraxml:` の項目がある写真は、書き換えない**（二重に書かない）。
 - 書き込みの手順: 1) 元のファイルを読んで検査する（PNG として読めること）→ 2) 新しい内容を一時ファイルに書く（チャンクの CRC を計算する）→ 3) 一時ファイルを検査する（PNG として読めること・画像のデータが元と同じこと）→ 4) 元のファイルを入れ替える。**途中で失敗したら、元のファイルは変えない**。設定で、書く前の元のファイルを別のフォルダにコピーしておくこともできる（既定はオフ）。
 - 設定で、写真には書かず、履歴だけにする（`writeXmp: false`）こともできる。
 
@@ -85,7 +85,7 @@ faravrc:Source="log"
 
 取り込み時に、写真のアバターを、次の順で決める。**すでに手で選んだアバターは上書きしない**（空の写真にだけ入れる）。
 
-1. 写真の XMP の `faravrc:AvatarName`（と `AvatarId`）。
+1. 写真の XMP の `faraxml:AvatarName`（と `AvatarId`）。
 2. 無ければ、`history.jsonl`（設定で場所を指定。既定は上の場所）から、撮影日時の直前の `avatar` イベント。
 
 アバターの名前を、アバターのマスタ（`content/avatars.json`）の名前・別名と比べる（**空白を取り、大文字小文字を区別しない**。VRChat の `Fara AlmarianDress` と、prefab の `FaraAlmarianDress` が合う）。合うものが無ければ入れない。
