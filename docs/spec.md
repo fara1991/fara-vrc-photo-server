@@ -64,8 +64,8 @@ VRChat で写真を撮ったとき、**そのときに操作していたアバ�
 
 ## 5. 写真への追記（XMP）
 
-- 見張る場所: 写真フォルダ（設定。既定は `<ピクチャ>\VRChat`。サブフォルダ `yyyy-MM` を含めて見る）。
-- 対象: `VRChat_yyyy-MM-dd_HH-mm-ss.fff_WxH.png`（ファイル名の日時が**撮影日時**。ローカル時刻）。
+- 見張る場所: 写真フォルダ（設定。既定は、そのユーザーの「ピクチャ」の下の `VRChat`（`C:\Users\{ユーザー}\Pictures\VRChat` の形。環境のフォルダの設定に従うので、どのユーザーでも同じ形。写真ブログのアプリも、同じ場所を読む）。サブフォルダ `yyyy-MM` を含めて見る）。
+- 対象: `VRChat_yyyy-MM-dd_HH-mm-ss.fff_WxH.png`（古い形の `VRChat_WxH_yyyy-MM-dd_HH-mm-ss.fff.png` も読む。ファイル名の日時が**撮影日時**。ローカル時刻）。
 - 作成された直後は、VRChat が書き込み中のことがある。**ファイルの大きさが 1 秒間変わらなくなってから**処理する。
 - 撮影日時の直前の `avatar` イベント（最大 24 時間前まで。ワールドに入った後の `avatar` を優先）を、写真のアバターとする。見つからなければ何も書かない。
 - 書き込み先: PNG の `iTXt` チャンク（キーワード `XML:com.adobe.xmp`）の、XMP の `rdf:Description` に、**独自の名前空間**の項目を足す。VRChat が書いた既存の項目（`vrc:` と `xmp:`）は、変えない。
@@ -100,7 +100,7 @@ faraxml:Source="log"
 | 項目 | 既定 | 内容 |
 | --- | --- | --- |
 | `displayName` | 空 | 自分の VRChat の表示名。空のあいだは何も記録しない |
-| `photoFolder` | `<ピクチャ>\VRChat` | 写真を見張るフォルダ |
+| `photoFolder` | ユーザーの「ピクチャ」の下の `VRChat` | 写真を見張るフォルダ |
 | `logFolder` | `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` | VRChat のログのフォルダ |
 | `historyPath` | `%LOCALAPPDATA%\FaraVrcPhotoExtension\history.jsonl` | 履歴ファイル |
 | `writeXmp` | `true` | 写真に追記するか |
@@ -125,7 +125,9 @@ faraxml:Source="log"
 | E4 | fara-vrc-photo-album 側の読み取り（第 6 節） |
 | E5（任意） | OSC の受信（服の番号のパラメーターなど） |
 
-## 10. 未確定（あとで確かめる）
+## 10. 確認結果と未確定
+
+**E2 で確認したこと**: 実際の VRChat の写真（1920x1080・3 MB）のコピーに追記して、(1) 画像として開けて、画素が元と同じ、(2) 元の XMP は 1 文字も変わらず、XML として正しい、(3) 控えのフォルダに元と同じファイルが残る、(4) 2 回目は何もしない、ことを確かめた。実際の写真には書いていない。
 
 - 切り替えの行と `Loading Avatar Data` の対応: 30 秒で足りていた（実ログの 58 件）。ほかのプレイヤーの読み込みの行は、混ざらなかった。ID が無い切り替えが 3 分の 1 ある（第 3 節）。
 - ワールドに入った直後のアバターの切り替えが、すべてログに出るか（出ない場合は、直前のワールドの行の後の最初の `avatar` を使う）。
