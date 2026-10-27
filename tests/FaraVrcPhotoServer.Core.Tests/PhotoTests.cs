@@ -235,4 +235,73 @@ public sealed class PhotoTests : IDisposable
             Assert.Equal(png.Length, only.Size);                                                          // 書き終わってから渡される
         }
     }
+
+    // ---------------------------------------------------------------- 控えを残さないときは、写真に直接書く
+
+    [Fact]
+    public void WithoutABackupTheTagIsWrittenIntoThePhotoFileItselfNotIntoAReplacement()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var path = Photo("direct.png");
+        var link = Path.Combine(_root, "direct-hardlink.png");
+        using (var cmd = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /H \"{link}\" \"{path}\"") { CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true })!)
+        {
+            cmd.StandardOutput.ReadToEnd();
+            cmd.WaitForExit();
+        }
+        if (!File.Exists(link)) return;                                                                      // ハードリンクを作れない環境では、確かめられない
+        var stamp = new DateTime(2026, 10, 28, 1, 50, 13, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(path, stamp);
+
+        var result = PhotoXmpWriter.Write(path, Info);
+
+        Assert.Equal(WriteOutcome.Written, result.Outcome);
+        Assert.Contains("直接", result.Message);
+        // ファイルそのものに書いたので、同じファイルを指すハードリンクにも、タグが見える（入れ替えだと、リンクは古い内容のまま切れる）
+        Assert.Equal("FaraFrillBlood", FaraXml.Read(XmpOf(File.ReadAllBytes(link)))!.AvatarName);
+        Assert.Equal(File.ReadAllBytes(path), File.ReadAllBytes(link));
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(path));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*" + PhotoXmpWriter.TempSuffix));
+    }
+
+    [Fact]
+    public void WithABackupTheOriginalIsKeptAndThePhotoIsReplacedAsBefore()
+    {
+        var backup = Path.Combine(_root, "backup2");
+        var path = Photo("kept.png");
+        var original = File.ReadAllBytes(path);
+
+        var result = PhotoXmpWriter.Write(path, Info, backup);
+
+        Assert.Equal(WriteOutcome.Written, result.Outcome);
+        Assert.DoesNotContain("直接", result.Message);                                                      // 控えを残すときは、今までの入れ替え
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(backup, "kept.png")));
+    }
+
+    [Fact]
+    public void APhotoThatCannotBeOpenedForWritingIsLeftUntouchedAndSaysSo()
+    {
+        var locked = Photo("locked.png");
+        var before = File.ReadAllBytes(locked);
+        using (new FileStream(locked, FileMode.Open, FileAccess.Read, FileShare.Read))                       // ほかのプログラムが、書き込みを許さずに開いている
+        {
+            var result = PhotoXmpWriter.Write(locked, Info);
+            Assert.Equal(WriteOutcome.Invalid, result.Outcome);
+        }
+        Assert.Equal(before, File.ReadAllBytes(locked));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*" + PhotoXmpWriter.TempSuffix));
+
+        var readOnly = Photo("readonly.png");
+        var readOnlyBefore = File.ReadAllBytes(readOnly);
+        File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        try
+        {
+            Assert.Equal(WriteOutcome.Invalid, PhotoXmpWriter.Write(readOnly, Info).Outcome);
+            Assert.Equal(readOnlyBefore, File.ReadAllBytes(readOnly));
+        }
+        finally
+        {
+            File.SetAttributes(readOnly, FileAttributes.Normal);
+        }
+    }
 }

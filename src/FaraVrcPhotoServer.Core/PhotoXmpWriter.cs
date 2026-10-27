@@ -21,7 +21,8 @@ public sealed record WriteResult(WriteOutcome Outcome, string Message);
 /// <item>元のファイルを読み、PNG として検査する（すべてのチャンクの CRC）。</item>
 /// <item>新しい内容をメモリに作り、<b>もう一度読んで検査する</b>（画素のデータが元と同じ・ほかのチャンクが元と同じ・追記した内容が読める）。</item>
 /// <item>（設定があれば）元のファイルを、控えのフォルダにコピーする。</item>
-/// <item>同じフォルダに一時ファイルを書き、入れ替える（File.Replace）。更新日時は元のままにする。</item>
+/// <item>控えを残さないとき: 写真のファイルに<b>直接</b>書く（先頭から書いて長さを合わせる）。書いたあとに読み直して確かめ、合わなければ元の内容に戻す。直接開けないときは、次の方法にする。</item>
+/// <item>控えを残すとき（または直接開けないとき）: 同じフォルダに一時ファイルを書き、入れ替える（File.Replace）。更新日時は元のままにする。</item>
 /// </list>
 /// どの段階で失敗しても、元のファイルは変えない（一時ファイルは消す）。
 /// </summary>
@@ -74,6 +75,14 @@ public static class PhotoXmpWriter
         var updated = new PngFile(chunks).ToBytes();
         if (Verify(png, updated, newXmp, info) is { } problem) return new WriteResult(WriteOutcome.Invalid, "書き込み前の検査に通りません: " + problem);
 
+        // 控えを残さないとき（既定）は、撮った写真のファイルに、直接タグを書き込む（ファイルそのものを残す）。
+        // 直接書き込めないとき（ほかのプログラムが開いている・読み取り専用など）は、下の「一時ファイル → 入れ替え」でやってみる。
+        if (backupFolder is not { Length: > 0 })
+        {
+            var direct = TryWriteInPlace(path, original, updated);
+            if (direct is not null) return direct;
+        }
+
         var temp = path + TempSuffix;
         try
         {
@@ -93,6 +102,72 @@ public static class PhotoXmpWriter
         finally
         {
             try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    /// <summary>
+    /// 写真のファイルに、新しい内容を直接書く（先頭から書いて、長さを合わせる）。更新日時・作成日時は元のまま。書いたあとに読み直して、新しい内容と同じか確かめる。
+    /// 開けなかったとき（まだ何も書いていない）は null（別の方法でやり直せる）。書き始めてから失敗したときは、元の内容を書き戻して、失敗を返す。
+    /// </summary>
+    private static WriteResult? TryWriteInPlace(string path, byte[] original, byte[] updated)
+    {
+        var written = File.GetLastWriteTimeUtc(path);
+        var created = File.GetCreationTimeUtc(path);
+        FileStream stream;
+        try
+        {
+            stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        using (stream)
+        {
+            try
+            {
+                stream.Write(updated);
+                stream.SetLength(updated.Length);
+                stream.Flush(flushToDisk: true);
+            }
+            catch (IOException e)
+            {
+                return Restore(stream, original, "書き込みの途中で失敗しました。元の内容に戻しました: " + e.Message);
+            }
+        }
+
+        try
+        {
+            if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(updated))
+            {
+                using var again = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read);
+                return Restore(again, original, "書き込んだ内容が合いません。元の内容に戻しました");
+            }
+            File.SetLastWriteTimeUtc(path, written);
+            File.SetCreationTimeUtc(path, created);
+            return new WriteResult(WriteOutcome.Written, "追記しました（写真に直接）");
+        }
+        catch (IOException e)
+        {
+            return new WriteResult(WriteOutcome.Invalid, "書き込んだあとの確認に失敗しました: " + e.Message);
+        }
+    }
+
+    /// <summary>書き込みに失敗した写真を、元の内容に戻す（できる範囲で）。</summary>
+    private static WriteResult Restore(FileStream stream, byte[] original, string reason)
+    {
+        try
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+            stream.Write(original);
+            stream.SetLength(original.Length);
+            stream.Flush(flushToDisk: true);
+            return new WriteResult(WriteOutcome.Invalid, reason);
+        }
+        catch (IOException e)
+        {
+            return new WriteResult(WriteOutcome.Invalid, reason + "（元の内容に戻せませんでした: " + e.Message + "）");
         }
     }
 
