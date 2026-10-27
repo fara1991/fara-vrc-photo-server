@@ -4,7 +4,14 @@ using System.Text.RegularExpressions;
 namespace FaraVrcPhotoServer;
 
 /// <summary>写真の処理の設定（docs/spec.md の第 7 節）。</summary>
-public sealed record PhotoOptions(bool WriteXmp = true, string? BackupFolder = null);
+/// <param name="WriteXmp">写真に追記するか（false なら履歴だけ）。</param>
+/// <param name="BackupFolder">書く前の元の写真のコピー先（決まったフォルダ）。null ならコピーしない。</param>
+/// <param name="BackupBesideOriginal">true なら、書く前の元の写真を、<b>その写真と同じ場所の backup フォルダ</b>に残す（BackupFolder より優先）。</param>
+public sealed record PhotoOptions(bool WriteXmp = true, string? BackupFolder = null, bool BackupBesideOriginal = false)
+{
+    /// <summary>フォルダ名（写真と同じ場所に作る）。見張りは、この名前のフォルダの中を無視する。</summary>
+    public const string BackupDirectoryName = "backup";
+}
 
 /// <summary>1 枚の写真の処理の結果。</summary>
 public enum PhotoOutcome
@@ -71,7 +78,8 @@ public sealed class PhotoProcessor(Func<IReadOnlyList<HistoryEvent>> loadHistory
         var info = new FaraXmlInfo(name, avatar.AvatarId);
         if (!options.WriteXmp) return new PhotoResult(PhotoOutcome.WriteDisabled, "設定で、写真には書きません", info);
 
-        var result = PhotoXmpWriter.Write(path, info, options.BackupFolder);
+        var backup = options.BackupBesideOriginal ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, PhotoOptions.BackupDirectoryName) : options.BackupFolder;
+        var result = PhotoXmpWriter.Write(path, info, backup);
         return result.Outcome switch
         {
             WriteOutcome.Written => new PhotoResult(PhotoOutcome.Written, result.Message, info),

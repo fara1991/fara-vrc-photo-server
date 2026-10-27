@@ -9,6 +9,7 @@ internal sealed class SettingsForm : Form
     private AppSettings _original;
     private readonly TextBox _history = Theme.Input();
     private readonly CheckBox _writeXmp = Theme.Check("写真にアバターの情報を追記する（オフなら、履歴だけに残す）");
+    private readonly CheckBox _backupOriginals = Theme.Check("元の写真を、写真と同じ場所の backup フォルダに残す");
     private readonly CheckBox _autoStart = Theme.Check("Windows の起動時に自動で起動する");
     private readonly Label _message = new() { AutoSize = true, ForeColor = Theme.Danger };
 
@@ -19,13 +20,14 @@ internal sealed class SettingsForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(700, 400);
+        ClientSize = new Size(700, 450);
         Theme.Apply(this);
 
         _name.Text = settings.DisplayName;
         _original = settings;
         _history.Text = settings.EffectiveHistoryPath;                                                       // 初期値（既定の場所）を入れておく
         _writeXmp.Checked = settings.WriteXmp;
+        _backupOriginals.Checked = settings.BackupOriginals;
         _autoStart.Checked = settings.AutoStart;
 
         var table = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(16, 12, 16, 12), AutoSize = false, BackColor = Color.White };
@@ -37,6 +39,11 @@ internal sealed class SettingsForm : Form
         AddRow(table, "履歴ファイル", _history, null, "撮影時のアバターの記録を残すファイルです。ふつうは、このままにしてください。");
         table.Controls.Add(_writeXmp, 1, table.RowCount);
         table.SetColumnSpan(_writeXmp, 2);
+        table.RowCount++;
+        table.Controls.Add(_backupOriginals, 1, table.RowCount);
+        table.SetColumnSpan(_backupOriginals, 2);
+        table.RowCount++;
+        table.Controls.Add(new Label { Text = "タグを埋め込んだ写真は、元の場所にそのまま置き、書き換える前の写真を backup フォルダに移します（容量が増えます）。", AutoSize = true, ForeColor = Theme.Muted, Padding = new Padding(22, 0, 0, 6) }, 1, table.RowCount);
         table.RowCount++;
         table.Controls.Add(_autoStart, 1, table.RowCount);
         table.SetColumnSpan(_autoStart, 2);
@@ -94,6 +101,7 @@ internal sealed class SettingsForm : Form
             DisplayName = _name.Text.Trim(),
             HistoryPath = HistoryPathToSave(),
             WriteXmp = _writeXmp.Checked,
+            BackupOriginals = _backupOriginals.Checked,
             AutoStart = _autoStart.Checked,
         };
         if (string.IsNullOrWhiteSpace(settings.DisplayName))

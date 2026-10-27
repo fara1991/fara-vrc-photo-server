@@ -87,10 +87,22 @@ public sealed class PhotoWatcher : IDisposable
     /// <summary>自分で書き換えた写真を、しばらく無視する（入れ替えで起きるイベントを、また処理しないため）。</summary>
     public void IgnoreForAWhile(string path) => _recent[path] = DateTime.UtcNow;
 
+    /// <summary>見張っているフォルダの下の、backup という名前のフォルダの中か（見張っているフォルダ自身の名前や、その上の階層は見ない）。</summary>
+    private bool IsInBackupFolder(string path)
+    {
+        var root = _watcher?.Path;
+        if (string.IsNullOrEmpty(root)) return false;
+        var relative = Path.GetRelativePath(root, path);
+        if (relative.StartsWith("..", StringComparison.Ordinal)) return false;
+        var directories = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[..^1];
+        return directories.Any(d => string.Equals(d, PhotoOptions.BackupDirectoryName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private void Enqueue(string path)
     {
         if (path.EndsWith(PhotoXmpWriter.TempSuffix, StringComparison.OrdinalIgnoreCase)) return;
         if (!path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) return;
+        if (IsInBackupFolder(path)) return;                                                                     // 元の写真の控え（backup フォルダ）は、見ない。見ると、控えにまた追記してしまう
         _queue.Writer.TryWrite(path);
     }
 
