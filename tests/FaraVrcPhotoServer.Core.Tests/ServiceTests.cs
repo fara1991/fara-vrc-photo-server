@@ -13,7 +13,11 @@ public sealed class ServiceTests : IDisposable
     private const string Avatar1 = "avtr_71bd1202-157a-4264-b888-a133209de9ca";
     private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-svc-" + Guid.NewGuid().ToString("N")[..8]);
 
-    public ServiceTests() => Directory.CreateDirectory(_root);
+    public ServiceTests()
+    {
+        Directory.CreateDirectory(_root);
+        AppLog.Path = Path.Combine(_root, "log", "app.log");                                              // テストの記録を、本物の置き場所に書かない
+    }
 
     public void Dispose()
     {
@@ -165,5 +169,57 @@ public sealed class ServiceTests : IDisposable
         Assert.Contains(service.Recent, r => r.Contains("設定で写真には書きません"));
         Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
         Assert.Equal("Mine", new HistoryStore(Path.Combine(_root, "service-history.jsonl")).Load().Single().AvatarName);
+    }
+
+    // ---------------------------------------------------------------- 見張りの失敗
+
+    [Fact]
+    public void TheSettingsFileDoesNotHoldTheComputedValues()
+    {
+        var store = new SettingsStore(Path.Combine(_root, "s2", "settings.json"));
+        store.Save(new AppSettings { DisplayName = "名前" });
+        var text = File.ReadAllText(store.Path);
+        Assert.DoesNotContain("effective", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("名前", store.Load().DisplayName);
+    }
+
+    [Fact]
+    public void AWatcherThatCannotStartSaysWhyInsteadOfJustFailing()
+    {
+        var missing = Path.Combine(_root, "no-such-folder");
+        var e = Assert.Throws<IOException>(() => new PhotoWatcher(missing, _ => { }));
+        Assert.Contains("見張れません", e.Message);
+        Assert.Contains(missing, e.Message);
+    }
+
+    [Fact]
+    public async Task TheServiceDoesNotCrashWhenTheWatchCannotStartAndKeepsRetryingUntilItWorks()
+    {
+        AppLog.Path = Path.Combine(_root, "log", "app.log");
+        var attempts = 0;
+        var settings = Settings(Dir("p5"), Dir("l5"));
+        using var service = new PhotoServerService(settings, Jst, (folder, onPhoto) =>
+        {
+            if (++attempts < 3) throw new IOException("Error reading the " + folder + " directory.");
+            return new PhotoWatcher(folder, onPhoto);
+        })
+        {
+            LogPollInterval = TimeSpan.FromMilliseconds(50),
+            RetryInterval = TimeSpan.FromMilliseconds(100),
+        };
+
+        Assert.True(service.Start());                                                                     // 失敗しても、落ちずに始まる
+        Assert.False(service.IsRunning);
+        Assert.Contains("見張れません", service.Status);
+
+        for (var i = 0; i < 100 && !service.IsRunning; i++) await Task.Delay(50);
+
+        Assert.True(service.IsRunning);
+        Assert.Equal("写真のフォルダを見張っています", service.Status);
+        Assert.True(attempts >= 3);
+        var log = File.ReadAllText(AppLog.Path);
+        Assert.Contains("写真のフォルダの見張り", log);
+        Assert.Contains("見張りを始めました", log);
+        Assert.DoesNotContain(Me, log);
     }
 }

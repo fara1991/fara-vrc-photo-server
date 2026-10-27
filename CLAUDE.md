@@ -8,6 +8,13 @@ fara-vrc-photo-server。VRChat のログを監視し、写真ができたとき�
 - 作業ブランチの PR は `develop` 向けに作る
 - `master` へは `develop` からのみマージする。master へのマージはユーザーが行う（Claude は develop → master の PR の作成まで）
 
+## リリース（必ず守る）
+
+- master へのマージ（develop → master。ユーザーが行う）で、GitHub Actions（.github/workflows/release.yml）が、インストーラーを作り、**版と同じタグ（v<版>）の Release** に載せる。Release には、取り込んだ PR の題が並ぶ（build/release-notes.ps1）。**PR の題は、何を対応したかが分かる文にする**（Release の説明になるため）。
+- **リリースしたあと（タグ v<版> ができたあと）にアプリ（src・installer・build）を変えるときは、develop の PR で `src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj` の `<Version>` を上げる**（機能の追加は minor、修正は patch）。上げないと、master への PR が Actions で止まる。まだリリースしていない版のあいだは、上げない。
+- アンインストールは、アプリが作ったデータ（%LOCALAPPDATA%\FaraVrcPhotoServer）もまとめて消す（installer の UninstallDelete）。利用者が選んだフォルダは消さない。
+- 日本語を含む PowerShell スクリプト（.ps1）・Inno Setup のスクリプト（.iss）は、**UTF-8（BOM つき）** で保存する（Windows PowerShell 5.1・Inno が、BOM なしを文字化けさせるため）。
+
 ## 方針
 
 - **VRChat 本体への改造・DLL の注入・メモリの読み取りはしない**（規約・EAC に触れるため）。やるのは、ログの読み取り・OSC の受信・写真フォルダの見張り・写真ファイルへの追記だけ。

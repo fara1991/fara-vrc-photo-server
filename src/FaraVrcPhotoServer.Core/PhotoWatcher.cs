@@ -25,15 +25,63 @@ public sealed class PhotoWatcher : IDisposable
     public PhotoWatcher(string folder, Action<string> onPhoto)
     {
         _onPhoto = onPhoto;
-        _watcher = new FileSystemWatcher(folder, "*.png")
-        {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-        };
-        _watcher.Created += (_, e) => Enqueue(e.FullPath);
-        _watcher.Renamed += (_, e) => Enqueue(e.FullPath);
-        _watcher.EnableRaisingEvents = true;
+        _watcher = StartWatching(folder, Enqueue);
         _worker = Task.Run(RunAsync);
+    }
+
+    /// <summary>
+    /// フォルダの見張りを始める。始められなかったとき（フォルダがリンクで、先のドライブが使えない・権限など）は、
+    /// リンクの先のフォルダでもやり直す。どちらもだめなら、原因を調べた文つきの例外にする（.NET は、どんな失敗でも「ディレクトリを読めません」と言うため）。
+    /// </summary>
+    private static FileSystemWatcher StartWatching(string folder, Action<string> enqueue)
+    {
+        var candidates = new List<string> { folder };
+        // リンク（ジャンクション）の先も、あとの候補にする。Windows は、管理者でない人が作ったジャンクションを「信頼されていないマウントポイント」として、
+        // たどれないことがある。そのときも、リンクをたどらずに先のパスを読んで、直接見張れる
+        if (ReparseTarget.TryGet(folder) is { } linked && Directory.Exists(linked)) candidates.Add(linked);
+
+        var failures = new List<string>();
+        foreach (var candidate in candidates)
+        {
+            FileSystemWatcher? watcher = null;
+            try
+            {
+                watcher = new FileSystemWatcher(candidate, "*.png")
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
+                };
+                watcher.Created += (_, e) => enqueue(e.FullPath);
+                watcher.Renamed += (_, e) => enqueue(e.FullPath);
+                watcher.EnableRaisingEvents = true;
+                return watcher;
+            }
+            catch (Exception e) when (e is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)
+            {
+                watcher?.Dispose();
+                failures.Add($"{candidate}（{Probe(candidate)}）");
+            }
+        }
+        throw new IOException("写真のフォルダを見張れません: " + string.Join(" / ", failures));
+    }
+
+    /// <summary>見張れなかったフォルダの様子（開けるか・中を読めるか）。原因をたどる手がかり。</summary>
+    private static string Probe(string folder)
+    {
+        try
+        {
+            if (!Directory.Exists(folder)) return "フォルダが見つかりません";
+            _ = Directory.EnumerateFileSystemEntries(folder).FirstOrDefault();
+            return "フォルダは読めるが、変更の監視を始められません";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "アクセスが拒否されました";
+        }
+        catch (IOException e)
+        {
+            return e.Message;
+        }
     }
 
     /// <summary>自分で書き換えた写真を、しばらく無視する（入れ替えで起きるイベントを、また処理しないため）。</summary>

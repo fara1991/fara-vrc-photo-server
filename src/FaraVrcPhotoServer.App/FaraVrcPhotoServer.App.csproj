@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- タスクトレイに常駐する本体（Windows 専用）。処理は Core の PhotoServerService。ここは画面（トレイ・設定・最近の処理）だけ -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>FaraVrcPhotoServer.App</RootNamespace>
+    <AssemblyName>FaraVrcPhotoServer</AssemblyName>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- 実行ファイルのプロパティ（詳細タブ）。版は、ここを直す（installer / build/publish.ps1 もこの値を使う） -->
+    <Version>1.0.0</Version>
+    <Product>FaraVRCPhotoServer</Product>
+    <Company>Fara</Company>
+    <Description>VRChat のログを読んで、写真を撮ったときのアバターの情報を写真に追記する、タスクトレイの常駐ソフト</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FaraVrcPhotoServer.Core\FaraVrcPhotoServer.Core.csproj" />
+  </ItemGroup>
+
+</Project>
