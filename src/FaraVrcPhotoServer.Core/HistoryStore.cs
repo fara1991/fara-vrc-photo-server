@@ -26,23 +26,40 @@ public sealed class HistoryStore(string path)
         return events.OrderBy(e => e.Time).ToList();
     }
 
-    /// <summary>まだ履歴に無いイベントだけを追記する。追記した数を返す。</summary>
+    /// <summary>
+    /// まだ履歴に無いイベントだけを追記する。追記した数を返す。
+    /// 既知のキーは、最初に一度だけ履歴から読んで、メモリに持つ（追加が無い回は、ファイルを読まずに戻る）。
+    /// </summary>
     public int Append(IEnumerable<HistoryEvent> events)
     {
-        var known = Load().Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
-        var fresh = new List<HistoryEvent>();
-        foreach (var e in events)
-            if (known.Add(e.Key)) fresh.Add(e);
-        if (fresh.Count == 0) return 0;
+        var batch = events as IReadOnlyCollection<HistoryEvent> ?? events.ToList();
+        if (batch.Count == 0) return 0;
 
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!);
-        var text = string.Concat(fresh.OrderBy(e => e.Time).Select(e => e.ToJsonLine() + "\n"));
-        using var stream = new FileStream(Path, FileMode.Append, FileAccess.Write, FileShare.Read);
-        // 前回が改行の前に途切れていたら、行を分けてから書く
-        if (stream.Length > 0 && !EndsWithNewline()) stream.WriteByte((byte)'\n');
-        stream.Write(new UTF8Encoding(false).GetBytes(text));
-        return fresh.Count;
+        lock (_gate)
+        {
+            _known ??= Load().Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
+            var fresh = new List<HistoryEvent>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var e in batch)
+                if (!_known.Contains(e.Key) && seen.Add(e.Key)) fresh.Add(e);
+            if (fresh.Count == 0) return 0;
+
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!);
+            var text = string.Concat(fresh.OrderBy(e => e.Time).Select(e => e.ToJsonLine() + "\n"));
+            using (var stream = new FileStream(Path, FileMode.Append, FileAccess.Write, FileShare.Read))
+            {
+                // 前回が改行の前に途切れていたら、行を分けてから書く
+                if (stream.Length > 0 && !EndsWithNewline()) stream.WriteByte((byte)'\n');
+                stream.Write(new UTF8Encoding(false).GetBytes(text));
+            }
+            // 書けてから、既知にする（書けなかった分は、次の回にまた書く）
+            foreach (var e in fresh) _known.Add(e.Key);
+            return fresh.Count;
+        }
     }
+
+    private readonly object _gate = new();
+    private HashSet<string>? _known;
 
     private bool EndsWithNewline()
     {
