@@ -6,7 +6,7 @@ public enum WriteOutcome
     /// <summary>追記した。</summary>
     Written,
 
-    /// <summary>すでに faraxml の項目がある。何も変えていない。</summary>
+    /// <summary>すでにアバターの項目（faratag、または旧形式の faraxml）がある。何も変えていない。</summary>
     AlreadyTagged,
 
     /// <summary>PNG として読めない・追記先が見つからない・検査に通らない・書けない。Message に、写真が今どうなっているか（変えていない・元に戻した・戻せなかった）を書く。</summary>
@@ -68,7 +68,7 @@ public static class PhotoXmpWriter
         if (index >= 0)
         {
             var xmp = FaraXml.ReadXmpChunk(chunks[index].Data)!;
-            if (FaraXml.Has(xmp)) return new WriteResult(WriteOutcome.AlreadyTagged, "すでに faraxml の項目があります");
+            if (FaraXml.Has(xmp)) return new WriteResult(WriteOutcome.AlreadyTagged, "すでにアバターの項目（faratag）があります");
             var added = FaraXml.AddTo(xmp, info);
             if (added is null) return Invalid("XMP の追記先（rdf:RDF）が見つかりません（写真は変えていません）");
             newXmp = added;

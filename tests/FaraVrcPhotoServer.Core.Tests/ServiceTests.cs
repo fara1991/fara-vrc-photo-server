@@ -140,13 +140,13 @@ public sealed class ServiceTests : IDisposable
         await File.WriteAllBytesAsync(path, MakePng());
 
         var xmp = "";
-        for (var i = 0; i < 100 && !xmp.Contains("faraxml:AvatarName"); i++)
+        for (var i = 0; i < 100 && !xmp.Contains("faratag:AvatarName"); i++)
         {
             await Task.Delay(100);
             xmp = Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path));
         }
 
-        Assert.Contains("faraxml:AvatarName=\"Later\"", xmp);                                              // 直前の切り替え（ID を待っている途中のもの）が使われた
+        Assert.Contains("<faratag:AvatarName>Later</faratag:AvatarName>", xmp);                                              // 直前の切り替え（ID を待っている途中のもの）が使われた
         Assert.DoesNotContain(Me, xmp);                                                                    // 表示名は写真に入らない
         Assert.Contains(service.Recent, r => r.Contains("Later") && r.Contains("追記しました"));
         Assert.DoesNotContain(service.Recent.Append(service.Status), s => s.Contains(Me));                 // 状態・最近の処理にも出ない
@@ -244,7 +244,7 @@ public sealed class ServiceTests : IDisposable
         var backup = Path.Combine(month, "backup", "VRChat_2026-10-28_01-55-05.000_8x6.png");
         Assert.True(File.Exists(backup));
         Assert.Equal(original, await File.ReadAllBytesAsync(backup));                                      // 控えは、書く前の元のまま
-        Assert.Contains("faraxml:AvatarName=\"Mine\"", Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path)));   // 元の場所には、タグを埋め込んだ写真
+        Assert.Contains("<faratag:AvatarName>Mine</faratag:AvatarName>", Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path)));   // 元の場所には、タグを埋め込んだ写真
         Assert.Single(Directory.EnumerateFiles(Path.Combine(month, "backup")));                            // 控えの控え（backup\backup）を作っていない
         Assert.Equal(1, service.Recent.Count(r => r.Contains(".png")));                                    // 処理は 1 回だけ
     }
