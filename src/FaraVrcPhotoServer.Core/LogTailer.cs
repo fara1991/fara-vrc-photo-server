@@ -57,15 +57,27 @@ public sealed class LogTailer(string logFolder, string displayName, HistoryStore
         var read = stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false);
         state.Position += read;
 
-        var data = state.Partial.Concat(buffer.AsSpan(0, read).ToArray()).ToArray();
-        var start = 0;
-        for (var i = 0; i < data.Length; i++)
+        // 前回の途中までと、今読んだ分を、つなげて 1 つの配列にする（LINQ で 1 バイトずつ連結しない）
+        byte[] data;
+        if (state.Partial.Length == 0)
         {
-            if (data[i] != (byte)'\n') continue;
-            var line = Encoding.UTF8.GetString(data, start, i - start).TrimEnd('\r');
-            events.AddRange(state.Parser.Feed(line));
-            start = i + 1;
+            data = read == buffer.Length ? buffer : buffer[..read];
         }
-        state.Partial = data[start..];                                                                            // 行の途中までのもの
+        else
+        {
+            data = new byte[state.Partial.Length + read];
+            state.Partial.CopyTo(data, 0);
+            buffer.AsSpan(0, read).CopyTo(data.AsSpan(state.Partial.Length));
+        }
+
+        var start = 0;
+        int newline;
+        while ((newline = Array.IndexOf(data, (byte)'\n', start)) >= 0)
+        {
+            var line = Encoding.UTF8.GetString(data, start, newline - start).TrimEnd('\r');
+            events.AddRange(state.Parser.Feed(line));
+            start = newline + 1;
+        }
+        state.Partial = data.AsSpan(start).ToArray();                                                             // 行の途中までのもの
     }
 }

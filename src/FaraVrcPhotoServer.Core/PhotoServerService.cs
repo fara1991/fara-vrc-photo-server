@@ -14,6 +14,7 @@ public sealed class PhotoServerService : IDisposable
     private readonly TimeZoneInfo? _zone;
     private readonly Func<string, Action<string>, IDisposable> _startWatching;
     private readonly object _gate = new();
+    private readonly object _tailGate = new();
     private readonly List<string> _recent = [];
     private HistoryStore? _history;
     private LogTailer? _tailer;
@@ -76,16 +77,23 @@ public sealed class PhotoServerService : IDisposable
             return false;
         }
         _history = new HistoryStore(_settings.EffectiveHistoryPath);
-        _tailer = new LogTailer(_settings.EffectiveLogFolder, _settings.DisplayName, _history, _zone);
-        try
+        var tailer = _tailer = new LogTailer(_settings.EffectiveLogFolder, _settings.DisplayName, _history, _zone);
+        // 今あるログを、先頭から読む（履歴に無い分だけ追記）。ログが大きいと時間がかかるので、背景で読む（画面は止めない）
+        _ = Task.Run(() =>
         {
-            Note($"ログを読みました（履歴に {_tailer.Poll()} 件を追記）");                                       // 今あるログを、先頭から読む（履歴に無い分だけ追記）
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            AppLog.Write("ログの読み込み", e);
-            Note("ログを読めませんでした（あとでやり直します）: " + e.Message);
-        }
+            int added;
+            try
+            {
+                lock (_tailGate) added = tailer.Poll();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                AppLog.Write("ログの読み込み", e);
+                Note("ログを読めませんでした（あとでやり直します）: " + e.Message);
+                return;
+            }
+            Note($"ログを読みました（履歴に {added} 件を追記）");
+        });
 
         _processor = new PhotoProcessor(() =>
         {
@@ -153,7 +161,8 @@ public sealed class PhotoServerService : IDisposable
     {
         try
         {
-            lock (_gate)
+            // ログ読みだけの鍵（画面が状態・最近の処理を読む鍵 _gate とは別。読みが長くても、画面は止まらない）
+            lock (_tailGate)
             {
                 _tailer?.Poll();
             }
