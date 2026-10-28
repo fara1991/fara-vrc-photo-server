@@ -11,12 +11,12 @@ public sealed class ServiceTests : IDisposable
     private static readonly TimeZoneInfo Jst = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");
     private const string Me = "テスト／Me";
     private const string Avatar1 = "avtr_71bd1202-157a-4264-b888-a133209de9ca";
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-svc-" + Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _root = TestEnv.NewFolder("fara-svc");
 
     public ServiceTests()
     {
-        Directory.CreateDirectory(_root);
         AppLog.Path = Path.Combine(_root, "log", "app.log");                                              // テストの記録を、本物の置き場所に書かない
+        PendingJournal.Folder = Path.Combine(_root, "pending");
     }
 
     public void Dispose()
@@ -273,5 +273,28 @@ public sealed class ServiceTests : IDisposable
         var store = new SettingsStore(Path.Combine(_root, "s3", "settings.json"));
         store.Save(new AppSettings { DisplayName = "名前", BackupOriginals = true });
         Assert.True(store.Load().BackupOriginals);
+    }
+
+    // ---------------------------------------------------------------- 前回の途中で止まった写真
+
+    [Fact]
+    public void TheServiceFirstPutsBackAPhotoThatWasLeftHalfWrittenAndThenStarts()
+    {
+        var photos = Dir("photos-recover");
+        var logs = Dir("logs-recover");
+        var path = Path.Combine(photos, "VRChat_2026-10-28_01-55-05.000_8x6.png");
+        var original = MakePng();
+        var stamp = new DateTime(2026, 10, 28, 1, 50, 13, DateTimeKind.Utc);
+        File.WriteAllBytes(path, original);
+        File.SetLastWriteTimeUtc(path, stamp);
+        Assert.NotNull(PendingJournal.TryBegin(path, original, [9, 9, 9], stamp, stamp));                  // 書き込みの直前に、退避を作った
+        File.WriteAllBytes(path, [1, 2]);                                                                   // 書きかけで止まった
+
+        using var service = new PhotoServerService(Settings(photos, logs), Jst);
+        Assert.True(service.Start());
+
+        Assert.Equal(original, File.ReadAllBytes(path));                                                   // 起動のときに、元に戻る
+        Assert.Contains(service.Recent, r => r.Contains("元に戻しました"));
+        Assert.False(Directory.Exists(PendingJournal.Folder) && Directory.EnumerateFiles(PendingJournal.Folder).Any());
     }
 }

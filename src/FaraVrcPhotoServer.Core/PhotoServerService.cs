@@ -59,6 +59,13 @@ public sealed class PhotoServerService : IDisposable
     /// <summary>始める。設定に問題があれば動かさず、false（理由は <see cref="Status"/>）。見張りを始められなくても true（やり直す）。</summary>
     public bool Start()
     {
+        // 前回の途中で止まった写真の書き込みを、先に戻す（表示名の設定が無くても、写真は戻す）
+        foreach (var message in PendingJournal.RecoverAll())
+        {
+            AppLog.Write(message);
+            Note(message);
+        }
+
         var problems = _settings.Problems();
         if (problems.Count > 0)
         {
@@ -136,14 +143,15 @@ public sealed class PhotoServerService : IDisposable
         }
     }
 
+    /// <summary>結果の文。失敗のときは、写真が今どうなっているか（変えていない・元に戻した・戻せなかった）を、処理の側が書いた文で出す。</summary>
     private static string Describe(PhotoResult r) => r.Outcome switch
     {
-        PhotoOutcome.Written => $"アバターを追記しました（{r.Info?.AvatarName}）",
+        PhotoOutcome.Written => $"アバターを追記しました（{r.Info?.AvatarName}）" + (r.Warning is null ? "" : "。" + r.Warning),
         PhotoOutcome.AlreadyTagged => "すでに追記済みです",
         PhotoOutcome.NoAvatar => "アバターが分からないので、何も書きませんでした",
         PhotoOutcome.WriteDisabled => $"設定で写真には書きません（{r.Info?.AvatarName}）",
         PhotoOutcome.NotPhoto => "VRChat の写真ではないので、何もしませんでした",
-        _ => "追記できませんでした（写真は変えていません）: " + r.Message,
+        _ => "追記できませんでした: " + r.Message,
     };
 
     private void Note(string message)
