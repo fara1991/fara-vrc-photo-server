@@ -52,6 +52,9 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 [Registry]
 ; 自動起動（アプリの設定の「Windows の起動時に自動で起動する」と同じ Run キー）。アンインストールで消す
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FaraVrcPhotoServer"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
+; タスクと無関係に、アンインストールで Run の値を消す（アプリの設定で自動起動をオンにしたあと、インストール時のタスクを外していても残らないように）。
+; インストールでは何もしない（ValueType: none）
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "FaraVrcPhotoServer"; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} を起動する"; Flags: nowait postinstall skipifsilent

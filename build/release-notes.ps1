@@ -16,6 +16,8 @@ $merges = git log $range --merges --format='%s%x1f%b%x1e' | Out-String
 foreach ($entry in ($merges -split [char]0x1e)) {
     $parts = $entry.Trim() -split [char]0x1f, 2
     if ($parts.Count -lt 2) { continue }
+    # develop → master の PR（master への merge commit）は、リリースする本体なので、変更の項目に入れない
+    if ($parts[0] -match ' from [^/\s]+/develop$') { continue }
     if ($parts[0] -match '^Merge pull request #(\d+)') {
         $title = ($parts[1] -split "`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
         if ($title) { $items.Add("- $($title.Trim()) (#$($Matches[1]))") }

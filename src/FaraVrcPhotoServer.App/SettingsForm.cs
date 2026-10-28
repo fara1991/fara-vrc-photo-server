@@ -43,7 +43,7 @@ internal sealed class SettingsForm : Form
         table.Controls.Add(_backupOriginals, 1, table.RowCount);
         table.SetColumnSpan(_backupOriginals, 2);
         table.RowCount++;
-        table.Controls.Add(new Label { Text = "タグを埋め込んだ写真は、元の場所にそのまま置き、書き換える前の写真を backup フォルダに移します（容量が増えます）。", AutoSize = true, ForeColor = Theme.Muted, Padding = new Padding(22, 0, 0, 6) }, 1, table.RowCount);
+        table.Controls.Add(new Label { Text = "タグを埋め込んだ写真は、元の場所にそのまま置き、書き換える前の写真を backup フォルダに残します（写真をコピーして残すので、容量が増えます）。", AutoSize = true, ForeColor = Theme.Muted, Padding = new Padding(22, 0, 0, 6) }, 1, table.RowCount);
         table.RowCount++;
         table.Controls.Add(_autoStart, 1, table.RowCount);
         table.SetColumnSpan(_autoStart, 2);

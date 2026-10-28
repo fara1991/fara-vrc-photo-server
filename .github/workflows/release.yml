@@ -12,8 +12,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# 既定の権限は読み取りだけ。Release を作るジョブだけ、書き込みを許す。
+# 作るのは master の push と、master からの手動実行だけ（ほかのブランチからの手動実行では、Release を作らない）。
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   version-check:
@@ -40,8 +42,11 @@ jobs:
 
   release:
     name: Build installer and publish Release
-    if: github.event_name != 'pull_request'
+    # master への push と、master からの手動実行だけ。pull_request（確認）では動かさない
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,7 +89,8 @@ jobs:
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          # 版を 6.7.0 に固定する（Chocolatey に 6.7.0 があることを確かめ、開発機と同じ版にそろえた）。上げるときは、ここを直す
+          if (-not (Test-Path $iscc)) { choco install innosetup --version=6.7.0 --no-progress -y }
 
       - name: Build the installer
         if: steps.exists.outputs.exists == 'false'
