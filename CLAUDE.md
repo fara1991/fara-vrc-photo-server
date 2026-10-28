@@ -11,6 +11,7 @@ fara-vrc-photo-server。VRChat のログを監視し、写真ができたとき�
 ## リリース（必ず守る）
 
 - master へのマージ（develop → master。ユーザーが行う）で、GitHub Actions（.github/workflows/release.yml）が、インストーラーを作り、**版と同じタグ（v<版>）の Release** に載せる。Release には、取り込んだ PR の題が並ぶ（build/release-notes.ps1）。**PR の題は、何を対応したかが分かる文にする**（Release の説明になるため）。
+- **ワークフロー（`.github/workflows/*.yml`）や `build/*.ps1` を変えたら、push の前に `node build/check-workflow-powershell.mjs` を実行する**（PowerShell の構文だけを確かめる。実行はしない）。release.yml の `"$tag: ..."`（`:` が変数名の一部と読まれる。`${tag}` と書く）で、Release が作れなかったことがあった。develop への PR には CI が無く、master へのマージで初めて動くので、構文エラーはここで先に見つける。Release のジョブ全体（choco・Inno Setup・gh release）は、実際の master への push でしか動かせない
 - **リリースしたあと（タグ v<版> ができたあと）にアプリ（src・installer・build）を変えるときは、develop の PR で `src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj` の `<Version>` を上げる**（機能の追加は minor、修正は patch）。上げないと、master への PR が Actions で止まる。まだリリースしていない版のあいだは、上げない。
 - アンインストールは、アプリが作ったデータ（%LOCALAPPDATA%\FaraVrcPhotoServer）もまとめて消す（installer の UninstallDelete）。利用者が選んだフォルダは消さない。
 - 日本語を含む PowerShell スクリプト（.ps1）・Inno Setup のスクリプト（.iss）は、**UTF-8（BOM つき）** で保存する（Windows PowerShell 5.1・Inno が、BOM なしを文字化けさせるため）。
