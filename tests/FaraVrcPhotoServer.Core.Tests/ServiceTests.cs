@@ -297,4 +297,32 @@ public sealed class ServiceTests : IDisposable
         Assert.Contains(service.Recent, r => r.Contains("元に戻しました"));
         Assert.False(Directory.Exists(PendingJournal.Folder) && Directory.EnumerateFiles(PendingJournal.Folder).Any());
     }
+
+    [Fact]
+    public async Task AMissingPhotoFolderIsWaitedForWhileTheLogsKeepBeingRead()
+    {
+        var photos = Path.Combine(_root, "late-photos");                                                    // まだ無い
+        var logs = Dir("logs-late");
+        var log = Path.Combine(logs, "output_log_2026-10-28_01-30-36.txt");
+        Append(log, Line("01:49:51", $"[Behaviour] Switching {Me} to avatar Early") + "\n");
+        using var service = new PhotoServerService(Settings(photos, logs), Jst)
+        {
+            LogPollInterval = TimeSpan.FromMilliseconds(50),
+            RetryInterval = TimeSpan.FromMilliseconds(100),
+        };
+
+        Assert.True(service.Start());                                                                      // 写真のフォルダが無くても、落ちずに始まる
+        Assert.False(service.IsRunning);
+        Assert.Contains("写真のフォルダがありません", service.Status);
+
+        Append(log, Line("01:55:00", $"[Behaviour] Switching {Me} to avatar Later") + "\n");                // 待つあいだも、ログは読み続ける
+        var history = new HistoryStore(Path.Combine(_root, "service-history.jsonl"));
+        for (var i = 0; i < 100 && !history.Load().Any(e => e.AvatarName == "Later"); i++) await Task.Delay(50);
+        Assert.Contains(history.Load(), e => e.AvatarName == "Later");
+
+        Directory.CreateDirectory(photos);                                                                  // 写真のフォルダが現れた
+        for (var i = 0; i < 100 && !service.IsRunning; i++) await Task.Delay(50);
+        Assert.True(service.IsRunning);
+        Assert.Equal("サーバ起動中です", service.Status);
+    }
 }

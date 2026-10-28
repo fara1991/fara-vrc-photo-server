@@ -48,7 +48,13 @@ public sealed record AppSettings
     [JsonIgnore]
     public string EffectiveHistoryPath => HistoryPath.Trim() is { Length: > 0 } p ? p : HistoryStore.DefaultPath;
 
-    /// <summary>動かすのに足りない・おかしい点（無ければ空）。</summary>
+    /// <summary>
+    /// 動かし始めるのに必要な点（無ければ空）。表示名が無いときだけ。写真・ログのフォルダが無いのは含めない（見つかるまで待つ）。
+    /// </summary>
+    public IReadOnlyList<string> StartProblems() =>
+        string.IsNullOrWhiteSpace(DisplayName) ? ["VRChat の表示名が未設定です"] : [];
+
+    /// <summary>動かすのに足りない・おかしい点（無ければ空）。画面の保存のあとの注意に使う。</summary>
     public IReadOnlyList<string> Problems()
     {
         var problems = new List<string>();
