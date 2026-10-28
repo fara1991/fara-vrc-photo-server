@@ -71,15 +71,18 @@ VRChat で写真を撮ったとき、**そのときに操作していたアバ�
 - 書き込み先: PNG の `iTXt` チャンク（キーワード `XML:com.adobe.xmp`）の、XMP の `rdf:Description` に、**独自の名前空間**の項目を足す。VRChat が書いた既存の項目（`vrc:` と `xmp:`）は、変えない。
 
 ```xml
-xmlns:faraxml="http://fara-labs.com/ns/faraxml/1.0/"
-faraxml:Version="1"
-faraxml:AvatarName="FaraFrillBlood"
-faraxml:AvatarId="avtr_71bd1202-157a-4264-b888-a133209de9ca"
-faraxml:Source="log"
+<rdf:Description xmlns:faratag="http://fara-labs.com/ns/faratag/1.0/">
+  <faratag:AvatarName>FaraFrillBlood</faratag:AvatarName>
+  <faratag:AvatarID>avtr_71bd1202-157a-4264-b888-a133209de9ca</faratag:AvatarID>
+  <faratag:Source>log</faratag:Source>
+  <faratag:Version>2</faratag:Version>
+</rdf:Description>
 ```
 
-- `AvatarId` は、分かったときだけ。`Source` は、取り出した方法（`log` または、後で足す `osc`）。
-- **すでに `faraxml:` の項目がある写真は、書き換えない**（二重に書かない）。
+- **形式は、既存の XMP を変えずに、閉じタグ `</rdf:RDF>` の直前へ、1 つの `rdf:Description`（子要素で 1 項目ずつ）を足す**。項目の順は `AvatarName`・`AvatarID`・`Source`・`Version`。
+- `AvatarID` は、分かったときだけ（ログの `Loading Avatar Data:avtr_…` が、切り替えの直後に無いときは、省く）。`Source` は、取り出した方法（`log` または、後で足す `osc`）。`Version` は形式の版（**2**。v1.0.0 の旧形式 `faraxml` は 1）。
+- **すでにアバターの項目（`faratag:`、または旧形式の `faraxml:`）がある写真は、書き換えない**（二重に書かない）。
+- **旧形式（v1.0.0。`xmlns:faraxml="http://fara-labs.com/ns/faraxml/1.0/"` の `rdf:Description` の属性 `faraxml:Version`・`AvatarName`・`AvatarId`・`Source`）は、読むだけ**（新しくは書かない。`AvatarId` の綴りも読む）。
 - 書き込みの手順: 1) 元のファイルを読んで検査する（PNG として読めること）→ 2) 新しい内容をメモリに作って検査する（PNG として読めること・画像のデータが元と同じこと・追記した内容が読めること）→ 3) 書く。
   - **控えを残さないとき（既定）は、写真のファイルに直接書く**: 書く前に、元の内容と記録（どの写真か・元の更新日時）を退避フォルダ（`%LOCALAPPDATA%\FaraVrcPhotoServer\pending`）に書く。写真は、書いている間ほかから開けない（FileShare.None）。先頭から書いて長さを合わせ、更新日時・作成日時は元のままにし、書いたあとに読み直して新しい内容と同じか確かめる。合わなければ、退避から元の内容に戻す。確かめ終えたら退避を消す。退避は、写真のフォルダにも backup にも残さない。直接開けないとき（ほかのプログラムが開いている・読み取り専用）は、次の方法でやり直し、それでもだめなら何も変えない。
     - **電源断・強制終了で、書き込みの途中で止まったとき**: 退避が残る。次回の起動で、写真を検査し、壊れていれば退避から元の内容に戻し、壊れていなければ退避を消す（写真は変えない）。戻せなかったときは、退避を残して、次の起動でまた試す。
@@ -91,7 +94,7 @@ faraxml:Source="log"
 
 取り込み時に、写真のアバターを、次の順で決める。**すでに手で選んだアバターは上書きしない**（空の写真にだけ入れる）。
 
-1. 写真の XMP の `faraxml:AvatarName`（と `AvatarId`）。
+1. 写真の XMP の `faratag:AvatarName`（と `AvatarID`）。v1.0.0 の旧形式 `faraxml:AvatarName`（と `AvatarId`）も読む。
 2. 無ければ、`history.jsonl`（設定で場所を指定。既定は上の場所）から、撮影日時の直前の `avatar` イベント。
 
 アバターの名前を、アバターのマスタ（`content/avatars.json`）の名前・別名と比べる（**空白を取り、大文字小文字を区別しない**。VRChat の `Fara AlmarianDress` と、prefab の `FaraAlmarianDress` が合う）。合うものが無ければ入れない。
