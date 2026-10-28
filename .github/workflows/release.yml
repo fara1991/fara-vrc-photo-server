@@ -38,7 +38,7 @@ jobs:
             Write-Host "::error::アプリを変更していますが、版（$version）のリリース（$tag）がすでにあります。FaraVrcPhotoServer.App.csproj の <Version> を上げてください。"
             exit 1
           }
-          Write-Host "版 $version（タグ $tag: $(if ($exists) { 'あり' } else { 'まだ無い' })）。アプリの変更: $(@($changed).Count) ファイル"
+          Write-Host "版 ${version}（タグ ${tag}: $(if ($exists) { 'あり' } else { 'まだ無い' })）。アプリの変更: $(@($changed).Count) ファイル"
 
   release:
     name: Build installer and publish Release
