@@ -13,6 +13,8 @@ public sealed class PendingJournal
 {
     private const string RecordSuffix = ".json";
     private const string OriginalSuffix = ".orig";
+    private const int RestoreAttempts = 5;
+    private static readonly TimeSpan RestoreRetryDelay = TimeSpan.FromMilliseconds(200);
 
     /// <summary>退避の置き場所。テストが差し替える。</summary>
     public static string Folder { get; set; } =
@@ -63,8 +65,8 @@ public sealed class PendingJournal
     /// <summary>退避を消す（記録を先に消す）。写真の書き換えが済んで確かめたあとに呼ぶ。</summary>
     public void Complete()
     {
-        TryDelete(_recordPath);
-        TryDelete(_originalPath);
+        // 記録を消せたときだけ、元の写真を消す（記録だけ残って元が無い、という形にしない）
+        if (TryDelete(_recordPath)) TryDelete(_originalPath);
     }
 
     /// <summary>
@@ -136,6 +138,11 @@ public sealed class PendingJournal
         {
             return "退避を読めないので、次の起動でもう一度試します: " + photo + "（" + e.Message + "）";
         }
+        if (Sha256(original) != record.OriginalSha256)
+        {
+            // 退避の中身が記録と違えば、戻すと別の内容で写真を上書きしてしまうので、何もしない（退避は残す）
+            return "退避の内容が記録と違うので、戻しませんでした（写真は変えていません。退避は残しています）: " + photo;
+        }
         if (!IsValidPng(original))
         {
             // 退避そのものが壊れていれば、戻すと写真をさらに壊すので、何もしない
@@ -192,21 +199,14 @@ public sealed class PendingJournal
     /// </summary>
     internal static bool RestoreFile(string path, byte[] bytes, DateTime lastWriteUtc, DateTime creationUtc)
     {
-        try
+        // ウイルス対策やインデクサが一時的に開いていることがあるので、少し間をおいて数回試す
+        var restored = false;
+        for (var attempt = 1; attempt <= RestoreAttempts && !restored; attempt++)
         {
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
-            {
-                stream.Write(bytes);
-                stream.SetLength(bytes.Length);
-                stream.Flush(flushToDisk: true);
-            }
-            if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(bytes)) return false;
+            if (attempt > 1) Thread.Sleep(RestoreRetryDelay);
+            restored = TryRestoreOnce(path, bytes);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            AppLog.Write("写真を元に戻す", e);
-            return false;
-        }
+        if (!restored) return false;
         try
         {
             File.SetLastWriteTimeUtc(path, lastWriteUtc);
@@ -217,6 +217,25 @@ public sealed class PendingJournal
             AppLog.Write("写真の更新日時を戻す", e);
         }
         return true;
+    }
+
+    private static bool TryRestoreOnce(string path, byte[] bytes)
+    {
+        try
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(bytes);
+                stream.SetLength(bytes.Length);
+                stream.Flush(flushToDisk: true);
+            }
+            return File.ReadAllBytes(path).AsSpan().SequenceEqual(bytes);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Write("写真を元に戻す", e);
+            return false;
+        }
     }
 
     internal static bool IsValidPng(byte[] bytes)
@@ -241,15 +260,18 @@ public sealed class PendingJournal
         stream.Flush(flushToDisk: true);
     }
 
-    private static void TryDelete(string path)
+    /// <summary>消す。消せたら true（無かった場合も true）。</summary>
+    private static bool TryDelete(string path)
     {
         try
         {
             if (File.Exists(path)) File.Delete(path);
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             AppLog.Write("退避の片付け", e);
+            return false;
         }
     }
 }

@@ -104,20 +104,36 @@ public static class PhotoXmpWriter
     {
         lock (PendingJournal.Gate)
         {
-            DateTime written;
-            DateTime created;
             FileStream stream;
             try
             {
-                written = File.GetLastWriteTimeUtc(path);
-                created = File.GetCreationTimeUtc(path);
-                stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);                  // 書いている間は、ほかから開けない
+                stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);              // 読んでいるあいだも書いているあいだも、ほかから開けない
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 return null;                                                                                      // 開けない。まだ何も変えていない
             }
 
+            // 開いたあとで、いま中にある内容が、検査した内容と同じか確かめる（検査のあとに変わっていたら、退避の内容が違ってしまうため）
+            try
+            {
+                var current = new MemoryStream();
+                stream.CopyTo(current);
+                if (!current.ToArray().AsSpan().SequenceEqual(original))
+                {
+                    stream.Dispose();
+                    return Invalid("検査のあとに写真が変わっていたので、書きませんでした（写真は変えていません）");
+                }
+                stream.Position = 0;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                stream.Dispose();
+                return null;
+            }
+
+            var written = File.GetLastWriteTimeUtc(path);
+            var created = File.GetCreationTimeUtc(path);
             var journal = PendingJournal.TryBegin(path, original, updated, written, created);
             if (journal is null)
             {
@@ -134,7 +150,7 @@ public static class PhotoXmpWriter
                     stream.Flush(flushToDisk: true);
                 }
             }
-            catch (IOException e)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 return Undo(path, original, written, created, journal, "書き込みの途中で失敗しました（" + e.Message + "）");
             }

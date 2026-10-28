@@ -25,10 +25,11 @@ public sealed class PngFile(IReadOnlyList<PngChunk> chunks)
 
     public static PngFile Parse(byte[] bytes)
     {
-        // 短すぎるファイルは、書き込みの途中（これから書かれる）かもしれない
-        if (bytes.Length < Signature.Length + 12) throw new PngTruncatedException("PNG として短すぎます（途中で切れているかもしれません）");
-        if (!bytes.AsSpan(0, Signature.Length).SequenceEqual(Signature))
+        // 先頭の印が違えば、PNG ではない（短くても、印の途中までが合っているなら、書き込みの途中かもしれない）
+        var prefix = Math.Min(bytes.Length, Signature.Length);
+        if (!bytes.AsSpan(0, prefix).SequenceEqual(Signature.AsSpan(0, prefix)))
             throw new InvalidDataException("PNG ではありません（先頭の印が違います）");
+        if (bytes.Length < Signature.Length + 12) throw new PngTruncatedException("PNG として短すぎます（途中で切れているかもしれません）");
         var chunks = new List<PngChunk>();
         var position = Signature.Length;
         while (position < bytes.Length)
