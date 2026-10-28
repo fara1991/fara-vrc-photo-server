@@ -13,6 +13,9 @@ public sealed class PendingJournal
 {
     private const string RecordSuffix = ".json";
     private const string OriginalSuffix = ".orig";
+
+    /// <summary>写真が見つからないまま、この期間が過ぎた退避は消す。</summary>
+    private static readonly TimeSpan ExpireWhenPhotoMissing = TimeSpan.FromDays(30);
     private const int RestoreAttempts = 5;
     private static readonly TimeSpan RestoreRetryDelay = TimeSpan.FromMilliseconds(200);
 
@@ -128,6 +131,13 @@ public sealed class PendingJournal
         {
             TryDelete(recordPath);
             return "退避の元の写真が無いので、戻せませんでした（写真は変えていません）: " + photo;
+        }
+        if (!File.Exists(photo) && File.GetLastWriteTimeUtc(recordPath) < DateTime.UtcNow - ExpireWhenPhotoMissing)
+        {
+            // 写真が消えた・名前を変えられたまま長く経った退避は、もう使わないので消す（起動のたびにメッセージを出し続けないため）
+            TryDelete(recordPath);
+            TryDelete(originalPath);
+            return "写真が見つからないまま期間が過ぎたので、退避を消しました（写真は変えていません）: " + photo;
         }
         byte[] original;
         try

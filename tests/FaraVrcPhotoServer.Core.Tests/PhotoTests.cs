@@ -465,4 +465,59 @@ public sealed class PhotoTests : IDisposable
         await finishing;
         Assert.Equal(WriteOutcome.Written, result.Outcome);
     }
+
+    // ---------------------------------------------------------------- 見張りの失敗・待ち切れ・控え
+
+    [Fact]
+    public async Task AWatcherThatReportsAnErrorIsRebuiltAndPicksUpPhotosItMissed()
+    {
+        var before = Path.Combine(_root, "VRChat_2026-10-28_01-50-12.345_8x6.png");
+        await File.WriteAllBytesAsync(before, MakePng());                                                  // 見張りを始める前にできた写真（イベントは来ない）
+        var seen = new List<string>();
+        var messages = new List<string>();
+        using var watcher = new PhotoWatcher(_root, p => { lock (seen) seen.Add(p); });
+        watcher.Problem += m => { lock (messages) messages.Add(m); };
+
+        watcher.RaiseErrorForTests();
+        for (var i = 0; i < 100 && seen.Count == 0; i++) await Task.Delay(100);
+
+        lock (seen) Assert.Equal(new[] { before }, seen);
+        lock (messages) Assert.Contains(messages, m => m.Contains("作り直し"));
+    }
+
+    [Fact]
+    public async Task APhotoThatFailsInTheHandlerIsReportedInsteadOfSilenced()
+    {
+        var messages = new List<string>();
+        using var watcher = new PhotoWatcher(_root, _ => throw new InvalidOperationException("テスト"));
+        watcher.Problem += m => { lock (messages) messages.Add(m); };
+
+        await File.WriteAllBytesAsync(Path.Combine(_root, "x.png"), MakePng());
+        for (var i = 0; i < 100 && messages.Count == 0; i++) await Task.Delay(100);
+
+        lock (messages) Assert.Contains(messages, m => m.Contains("例外") && m.Contains("x.png"));
+    }
+
+    [Fact]
+    public async Task WaitingForAPhotoThatIsGoneGivesUpAtOnce()
+    {
+        var started = DateTime.UtcNow;
+        Assert.False(await PhotoWatcher.WaitUntilStableAsync(Path.Combine(_root, "gone.png"), CancellationToken.None));
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(5));                                   // 30 秒は待たない
+    }
+
+    [Fact]
+    public async Task APhotoInTheSettingsBackupFolderIsNotWatchedButItsSiblingIs()
+    {
+        var kept = Directory.CreateDirectory(Path.Combine(_root, "kept-copies")).FullName;
+        var seen = new List<string>();
+        using var watcher = new PhotoWatcher(_root, p => { lock (seen) seen.Add(Path.GetFileName(p)); }, kept);
+
+        await File.WriteAllBytesAsync(Path.Combine(kept, "VRChat_2026-10-28_01-55-01.000_8x6.png"), MakePng());
+        await File.WriteAllBytesAsync(Path.Combine(_root, "VRChat_2026-10-28_01-55-02.000_8x6.png"), MakePng());
+        for (var i = 0; i < 100 && seen.Count == 0; i++) await Task.Delay(100);
+        await Task.Delay(2000);
+
+        lock (seen) Assert.Equal(new[] { "VRChat_2026-10-28_01-55-02.000_8x6.png" }, seen);
+    }
 }

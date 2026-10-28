@@ -29,7 +29,9 @@ public sealed class PhotoServerService : IDisposable
     {
         _settings = settings;
         _zone = zone;
-        _startWatching = startWatching ?? ((folder, onPhoto) => new PhotoWatcher(folder, onPhoto));
+        // 設定の控えのフォルダの中は、見張らない（控えに、また追記しないため）
+        var excluded = settings.BackupFolder is { Length: > 0 } b ? b : null;
+        _startWatching = startWatching ?? ((folder, onPhoto) => new PhotoWatcher(folder, onPhoto, excluded));
     }
 
     /// <summary>ログを読む間隔。</summary>
@@ -66,7 +68,8 @@ public sealed class PhotoServerService : IDisposable
             Note(message);
         }
 
-        var problems = _settings.Problems();
+        // 表示名が無いときだけ、動かさない。写真・ログのフォルダが無いときは、見つかるまで待つ（ログは、待つあいだも読み続ける）
+        var problems = _settings.StartProblems();
         if (problems.Count > 0)
         {
             SetStatus(string.Join(" / ", problems));
@@ -99,10 +102,16 @@ public sealed class PhotoServerService : IDisposable
     private void TryStartWatching()
     {
         _lastWatchAttempt = DateTime.UtcNow;
+        var folder = _settings.EffectivePhotoFolder;
+        if (!Directory.Exists(folder))
+        {
+            SetStatus($"写真のフォルダがありません（{(int)RetryInterval.TotalSeconds} 秒ごとに確かめます）: {folder}");
+            return;
+        }
         try
         {
             IDisposable? watcher = null;
-            watcher = _startWatching(_settings.EffectivePhotoFolder, path =>
+            watcher = _startWatching(folder, path =>
             {
                 var result = _processor!.Process(path);
                 (watcher as PhotoWatcher)?.IgnoreForAWhile(path);
@@ -110,8 +119,17 @@ public sealed class PhotoServerService : IDisposable
                 AppLog.Write(line);
                 Note(line);
             });
-            _watcher = watcher;
-            SetStatus("サーバ起動中です");
+            if (watcher is PhotoWatcher photoWatcher) photoWatcher.Problem += Note;                             // 写真ごとの失敗・見張りの作り直しを、最近の処理に出す
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    watcher.Dispose();                                                                          // 止めたあとに始まったものは、残さない（Tick との競合）
+                    return;
+                }
+                _watcher = watcher;
+            }
+            SetStatus("サーバ起動中です" + (Directory.Exists(_settings.EffectiveLogFolder) ? "" : "（VRChat のログのフォルダがありません。見つかるまで待ちます）"));
             AppLog.Write("写真のフォルダの見張りを始めました");
         }
         catch (Exception e) when (e is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)
@@ -123,7 +141,10 @@ public sealed class PhotoServerService : IDisposable
 
     private void Tick()
     {
-        if (_disposed) return;
+        lock (_gate)
+        {
+            if (_disposed) return;
+        }
         Poll();
         if (_watcher is null && DateTime.UtcNow - _lastWatchAttempt >= RetryInterval) TryStartWatching();
     }
@@ -172,11 +193,16 @@ public sealed class PhotoServerService : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
+        IDisposable? watcher;
+        lock (_gate)
+        {
+            _disposed = true;                                                                                    // 以後は、Tick も見張りを始めない
+            watcher = _watcher;
+            _watcher = null;
+            _status = "停止中";
+        }
         _timer?.Dispose();
-        _watcher?.Dispose();
         _timer = null;
-        _watcher = null;
-        lock (_gate) _status = "停止中";
+        watcher?.Dispose();                                                                                      // 書き込みの終わりを待つ（PhotoWatcher.Dispose）
     }
 }
