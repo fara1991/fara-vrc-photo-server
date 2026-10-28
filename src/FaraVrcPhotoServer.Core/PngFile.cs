@@ -7,6 +7,12 @@ namespace FaraVrcPhotoServer;
 public sealed record PngChunk(string Type, byte[] Data);
 
 /// <summary>
+/// PNG が途中で切れている（IEND が無い・チャンクが途中まで）。書き込みの途中のファイルも、これになる。少し待てば読めるかもしれないので、
+/// <see cref="InvalidDataException"/> とは別の型にしてある（呼ぶ側は、両方を「PNG として読めない」として扱う）。
+/// </summary>
+public sealed class PngTruncatedException(string message) : Exception(message);
+
+/// <summary>
 /// PNG ファイルをチャンクの並びとして読み、書き戻す（画素のデータ IDAT などは、そのままのバイトで持つ）。
 /// 読むときに、シグネチャ・IHDR が最初・IEND が最後・すべてのチャンクの CRC を検査する。合わなければ <see cref="InvalidDataException"/>。
 /// 書き出しは、読んだチャンクをそのまま並べ直すだけなので、変えていないチャンクは元とバイトまで同じ。
@@ -19,15 +25,18 @@ public sealed class PngFile(IReadOnlyList<PngChunk> chunks)
 
     public static PngFile Parse(byte[] bytes)
     {
-        if (bytes.Length < Signature.Length + 12 || !bytes.AsSpan(0, Signature.Length).SequenceEqual(Signature))
+        // 先頭の印が違えば、PNG ではない（短くても、印の途中までが合っているなら、書き込みの途中かもしれない）
+        var prefix = Math.Min(bytes.Length, Signature.Length);
+        if (!bytes.AsSpan(0, prefix).SequenceEqual(Signature.AsSpan(0, prefix)))
             throw new InvalidDataException("PNG ではありません（先頭の印が違います）");
+        if (bytes.Length < Signature.Length + 12) throw new PngTruncatedException("PNG として短すぎます（途中で切れているかもしれません）");
         var chunks = new List<PngChunk>();
         var position = Signature.Length;
         while (position < bytes.Length)
         {
-            if (bytes.Length - position < 12) throw new InvalidDataException("PNG のチャンクが途中で切れています");
+            if (bytes.Length - position < 12) throw new PngTruncatedException("PNG のチャンクが途中で切れています");
             var length = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(position, 4));
-            if (length > int.MaxValue || position + 12L + length > bytes.Length) throw new InvalidDataException("PNG のチャンクの長さが合いません");
+            if (length > int.MaxValue || position + 12L + length > bytes.Length) throw new PngTruncatedException("PNG のチャンクの長さが合いません（途中で切れています）");
             var typeBytes = bytes.AsSpan(position + 4, 4);
             foreach (var b in typeBytes)
                 if (!char.IsAsciiLetter((char)b)) throw new InvalidDataException("PNG のチャンクの種類が不正です");
@@ -37,7 +46,7 @@ public sealed class PngFile(IReadOnlyList<PngChunk> chunks)
             position += 12 + (int)length;
         }
         if (chunks.Count < 2 || chunks[0].Type != "IHDR") throw new InvalidDataException("PNG の最初が IHDR ではありません");
-        if (chunks[^1].Type != "IEND") throw new InvalidDataException("PNG の最後が IEND ではありません（途中で切れているかもしれません）");
+        if (chunks[^1].Type != "IEND") throw new PngTruncatedException("PNG の最後が IEND ではありません（途中で切れているかもしれません）");
         return new PngFile(chunks);
     }
 

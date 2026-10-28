@@ -12,6 +12,9 @@ public sealed class PhotoWatcher : IDisposable
 {
     public static readonly TimeSpan StableFor = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan GiveUpAfter = TimeSpan.FromSeconds(30);
+
+    /// <summary>止めるとき、写真の書き込みの終わりを待つ上限。</summary>
+    public static readonly TimeSpan ExitGrace = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan IgnoreAfterWrite = TimeSpan.FromSeconds(5);
 
@@ -164,13 +167,19 @@ public sealed class PhotoWatcher : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// 止める。写真を書いているあいだ（<see cref="_onPhoto"/> の中）は、終わるまで待つ（上限は <see cref="ExitGrace"/>）。
+    /// 途中で止めると、写真が書きかけになる。待ち切れなければ、次の起動で退避から検査して戻す。
+    /// </summary>
     public void Dispose()
     {
         _watcher.EnableRaisingEvents = false;
         _watcher.Dispose();
         _queue.Writer.TryComplete();
         _cts.Cancel();
-        try { _worker.Wait(TimeSpan.FromSeconds(2)); } catch (AggregateException) { }
-        _cts.Dispose();
+        bool finished;
+        try { finished = _worker.Wait(ExitGrace); } catch (AggregateException) { finished = true; }
+        if (finished) _cts.Dispose();                                                                          // まだ動いているときは、CTS を捨てない（動いている側が使うため）
+        else AppLog.Write("写真の処理が終わるのを待ちきれませんでした（書き込みの途中かもしれません。次の起動で、途中の写真を検査して戻します）");
     }
 }

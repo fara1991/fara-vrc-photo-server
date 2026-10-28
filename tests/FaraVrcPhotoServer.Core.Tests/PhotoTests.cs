@@ -11,9 +11,17 @@ namespace FaraVrcPhotoServer.Core.Tests;
 public sealed class PhotoTests : IDisposable
 {
     private static readonly TimeZoneInfo Jst = TimeZoneInfo.CreateCustomTimeZone("JST", TimeSpan.FromHours(9), "JST", "JST");
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-photo-" + Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _root = TestEnv.NewFolder("fara-photo");
 
-    public PhotoTests() => Directory.CreateDirectory(_root);
+    public PhotoTests()
+    {
+        // 退避と記録は、このテストのフォルダの中に作る（本物の置き場所・ほかのテストと分ける）
+        PendingJournal.Folder = Path.Combine(_root, "pending");
+        AppLog.Path = Path.Combine(_root, "app.log");
+    }
+
+    private IReadOnlyList<string> JournalFiles() =>
+        Directory.Exists(PendingJournal.Folder) ? Directory.EnumerateFiles(PendingJournal.Folder).ToList() : [];
 
     public void Dispose()
     {
@@ -53,8 +61,8 @@ public sealed class PhotoTests : IDisposable
         var badCrc = (byte[])png.Clone();
         badCrc[^20] ^= 0xFF;                                                                               // 本体を 1 バイト壊す
         Assert.Contains("CRC", Assert.Throws<InvalidDataException>(() => PngFile.Parse(badCrc)).Message);
-        Assert.Throws<InvalidDataException>(() => PngFile.Parse(png[..^12]));                              // IEND が無い（途中で切れた）
-        Assert.Throws<InvalidDataException>(() => PngFile.Parse(png[..^5]));                               // チャンクの途中で切れた
+        Assert.Throws<PngTruncatedException>(() => PngFile.Parse(png[..^12]));                             // IEND が無い（途中で切れた）
+        Assert.Throws<PngTruncatedException>(() => PngFile.Parse(png[..^5]));                              // チャンクの途中で切れた
     }
 
     // ---------------------------------------------------------------- 追記
@@ -249,7 +257,7 @@ public sealed class PhotoTests : IDisposable
             cmd.StandardOutput.ReadToEnd();
             cmd.WaitForExit();
         }
-        if (!File.Exists(link)) return;                                                                      // ハードリンクを作れない環境では、確かめられない
+        Assert.True(File.Exists(link), "ハードリンクを作れなかったので、この確認はできません（写真のフォルダが NTFS か確かめてください）");
         var stamp = new DateTime(2026, 10, 28, 1, 50, 13, DateTimeKind.Utc);
         File.SetLastWriteTimeUtc(path, stamp);
 
@@ -303,5 +311,158 @@ public sealed class PhotoTests : IDisposable
         {
             File.SetAttributes(readOnly, FileAttributes.Normal);
         }
+    }
+
+    // ---------------------------------------------------------------- 途中で止まったとき（退避・復元）
+
+    [Fact]
+    public void ADirectWriteThatDoesNotReadBackTheSameIsPutBackAndTheJournalIsGone()
+    {
+        var path = Photo("restore.png");
+        var original = File.ReadAllBytes(path);
+        var stamp = new DateTime(2026, 10, 28, 1, 50, 13, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(path, stamp);
+        PhotoXmpWriter.AfterDirectWriteForTests = p => File.WriteAllBytes(p, new byte[] { 1, 2, 3 });   // 書いたあとに、内容が違っていた
+        try
+        {
+            var result = PhotoXmpWriter.Write(path, Info);
+
+            Assert.Equal(WriteOutcome.Invalid, result.Outcome);
+            Assert.Contains("元の内容に戻しました", result.Message);
+        }
+        finally
+        {
+            PhotoXmpWriter.AfterDirectWriteForTests = null;
+        }
+        Assert.Equal(original, File.ReadAllBytes(path));
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(path));
+        Assert.Empty(JournalFiles());                                                                      // 戻せたので、退避は消えている
+    }
+
+    [Fact]
+    public void WhenThePhotoCannotBeReopenedTheJournalStaysUntilTheNextStart()
+    {
+        var path = Photo("kept-journal.png");
+        var original = File.ReadAllBytes(path);
+        FileStream? holder = null;
+        PhotoXmpWriter.AfterDirectWriteForTests = p =>
+        {
+            File.WriteAllBytes(p, new byte[] { 1, 2, 3 });                                                 // 壊れた内容にして
+            holder = new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.None);                    // ほかから開けないようにする（確かめも戻すことも、できない）
+        };
+        try
+        {
+            var result = PhotoXmpWriter.Write(path, Info);
+
+            Assert.Equal(WriteOutcome.Invalid, result.Outcome);
+            Assert.Contains("次の起動で元に戻します", result.Message);
+            Assert.Single(JournalFiles(), f => f.EndsWith(".json", StringComparison.Ordinal));
+        }
+        finally
+        {
+            PhotoXmpWriter.AfterDirectWriteForTests = null;
+            holder?.Dispose();
+        }
+        Assert.NotEqual(original, File.ReadAllBytes(path));                                                // まだ戻していない
+
+        var messages = PendingJournal.RecoverAll();                                                        // 次の起動で
+        Assert.Contains(messages, m => m.Contains("元に戻しました"));
+        Assert.Equal(original, File.ReadAllBytes(path));
+        Assert.Empty(JournalFiles());
+    }
+
+    [Fact]
+    public void AStartAfterACrashPutsBackADamagedPhotoAndOnlyCleansUpTheRest()
+    {
+        var original = MakePng();
+        var copy = Photo("crash-copy.png", original);
+        Assert.Equal(WriteOutcome.Written, PhotoXmpWriter.Write(copy, Info).Outcome);
+        var updated = File.ReadAllBytes(copy);                                                              // 書き終えた内容（正しいタグつき）
+
+        // 書きかけで止まった: 退避はあり、写真は途中まで
+        var torn = Photo("torn.png", original);
+        var stamp = new DateTime(2026, 10, 28, 1, 50, 13, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(torn, stamp);
+        Assert.NotNull(PendingJournal.TryBegin(torn, original, updated, stamp, stamp));
+        File.WriteAllBytes(torn, updated[..^40]);
+
+        // 書き終えて、退避を消す前に止まった: 写真は正しい内容
+        Assert.NotNull(PendingJournal.TryBegin(copy, original, updated, stamp, stamp));
+
+        var messages = PendingJournal.RecoverAll();
+
+        Assert.Equal(original, File.ReadAllBytes(torn));                                                   // 壊れていた写真は元に戻る
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(torn));
+        Assert.Equal(updated, File.ReadAllBytes(copy));                                                    // 正しい写真には触れない
+        Assert.Contains(messages, m => m.Contains("元に戻しました") && m.Contains("torn.png"));
+        Assert.Contains(messages, m => m.Contains("最後まで済んでいた") && m.Contains("crash-copy.png"));
+        Assert.Empty(JournalFiles());
+    }
+
+    [Fact]
+    public void ABrokenRecordIsDroppedAndThePhotoIsNotTouched()
+    {
+        var path = Photo("pending-check.png");
+        var before = File.ReadAllBytes(path);
+        Assert.NotNull(PendingJournal.TryBegin(path, before, [9, 9, 9], DateTime.UtcNow, DateTime.UtcNow));
+        var record = JournalFiles().Single(f => f.EndsWith(".json", StringComparison.Ordinal));
+        File.WriteAllText(record, "{ 壊れた記録");                                                       // 記録の中身が壊れている
+        var messages = PendingJournal.RecoverAll();
+        Assert.Contains(messages, m => m.Contains("記録が壊れていた"));
+        Assert.Empty(JournalFiles());
+        Assert.Equal(before, File.ReadAllBytes(path));                                                     // 写真には触れない
+    }
+
+    [Fact]
+    public void APhotoWithTwoXmpChunksIsRefusedWithoutAnException()
+    {
+        var chunks = PngFile.Parse(MakePng()).Chunks.ToList();
+        chunks.Insert(chunks.FindIndex(c => c.Type == "IDAT"), new PngChunk("iTXt", FaraXml.BuildXmpChunk("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"/>")));
+        var path = Photo("two-xmp.png", new PngFile(chunks).ToBytes());
+        var before = File.ReadAllBytes(path);
+
+        var result = PhotoXmpWriter.Write(path, Info);
+
+        Assert.Equal(WriteOutcome.Invalid, result.Outcome);
+        Assert.Contains("2 つ", result.Message);
+        Assert.Equal(before, File.ReadAllBytes(path));
+        Assert.Empty(JournalFiles());
+    }
+
+    [Fact]
+    public void WhenOnlyTheTimestampCannotBeSetAfterTheReplaceTheTagStillCountsAsWritten()
+    {
+        var path = Photo("stamp.png");
+        PhotoXmpWriter.AfterReplaceForTests = _ => throw new IOException("時刻を設定できません（テスト）");
+        try
+        {
+            var result = PhotoXmpWriter.Write(path, Info, Path.Combine(_root, "backup-stamp"));
+
+            Assert.Equal(WriteOutcome.Written, result.Outcome);
+            Assert.NotNull(result.Warning);
+            Assert.Contains("更新日時", result.Warning);
+            Assert.Equal("FaraFrillBlood", FaraXml.Read(XmpOf(File.ReadAllBytes(path)))!.AvatarName);
+        }
+        finally
+        {
+            PhotoXmpWriter.AfterReplaceForTests = null;
+        }
+    }
+
+    [Fact]
+    public async Task APhotoStillBeingWrittenIsReadAgainInsteadOfBeingRefused()
+    {
+        var full = MakePng();
+        var path = Photo("growing.png", full[..^12]);                                                      // IEND の手前まで
+        var finishing = Task.Run(async () =>
+        {
+            await Task.Delay(1500);
+            await File.WriteAllBytesAsync(path, full);                                                      // 少し遅れて書き終わる
+        });
+
+        var result = PhotoXmpWriter.Write(path, Info);
+
+        await finishing;
+        Assert.Equal(WriteOutcome.Written, result.Outcome);
     }
 }

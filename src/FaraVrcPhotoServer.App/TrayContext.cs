@@ -82,9 +82,10 @@ internal sealed class TrayContext : ApplicationContext
         {
             _store.Save(settings);
             AutoStart.Apply(settings.AutoStart);
+            // 先に止めてから、新しく始める（書き込みの途中の写真を、新しい本体の起動時の復元が触らないように）
             var old = _service;
-            _service = StartService();
             old.Dispose();
+            _service = StartService();
         };
         _settingsForm.Show();
     }

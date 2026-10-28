@@ -8,7 +8,7 @@ namespace FaraVrcPhotoServer.Core.Tests;
 /// <summary>ジャンクションのリンク先の読み取り（リンクをたどれない環境でも、先のフォルダを直接見張れるように）。</summary>
 public sealed class ReparseTargetTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "fara-reparse-" + Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _root = TestEnv.NewFolder("fara-reparse");
 
     public ReparseTargetTests() => Directory.CreateDirectory(_root);
 
@@ -57,7 +57,7 @@ public sealed class ReparseTargetTests : IDisposable
             cmd.StandardOutput.ReadToEnd();
             cmd.WaitForExit();
         }
-        if (!Directory.Exists(link)) return;                                                                                 // 作れない環境では、確かめられない
+        Assert.True(Directory.Exists(link), "ジャンクションを作れなかったので、この確認はできません（mklink /J が使えるか確かめてください）");
 
         Assert.Equal(target, ReparseTarget.TryGet(link), ignoreCase: true);
         Assert.Null(ReparseTarget.TryGet(target));
@@ -75,7 +75,7 @@ public sealed class ReparseTargetTests : IDisposable
             cmd.StandardOutput.ReadToEnd();
             cmd.WaitForExit();
         }
-        if (!Directory.Exists(link)) return;
+        Assert.True(Directory.Exists(link), "ジャンクションを作れなかったので、この確認はできません（mklink /J が使えるか確かめてください）");
         var seen = new List<string>();
         using var watcher = new PhotoWatcher(link, p => { lock (seen) seen.Add(p); });
 

@@ -35,7 +35,8 @@ public enum PhotoOutcome
     Failed,
 }
 
-public sealed record PhotoResult(PhotoOutcome Outcome, string Message, FaraXmlInfo? Info = null);
+/// <summary>1 枚の結果。Message は、写真が今どうなっているか（変えていない・元に戻した・戻せなかった）を含む。Warning は、追記は済んだが後始末だけ問題があったとき。</summary>
+public sealed record PhotoResult(PhotoOutcome Outcome, string Message, FaraXmlInfo? Info = null, string? Warning = null);
 
 /// <summary>VRChat の写真のファイル名（撮影日時の読み取り）。</summary>
 public static partial class PhotoNaming
@@ -82,7 +83,7 @@ public sealed class PhotoProcessor(Func<IReadOnlyList<HistoryEvent>> loadHistory
         var result = PhotoXmpWriter.Write(path, info, backup);
         return result.Outcome switch
         {
-            WriteOutcome.Written => new PhotoResult(PhotoOutcome.Written, result.Message, info),
+            WriteOutcome.Written => new PhotoResult(PhotoOutcome.Written, result.Message, info, result.Warning),
             WriteOutcome.AlreadyTagged => new PhotoResult(PhotoOutcome.AlreadyTagged, result.Message),
             _ => new PhotoResult(PhotoOutcome.Failed, result.Message),
         };
