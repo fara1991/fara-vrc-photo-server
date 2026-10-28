@@ -1,0 +1,117 @@
+name: Release
+
+# master へのマージ（develop → master の PR）で、インストーラーを作り、バージョンと同じタグ（v<版>）の Release に載せる。
+# 版は src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj の <Version>。
+# すでに同じタグの Release がある（版を上げていない）ときは、新しく作らない（上書きしない）。
+# master への PR では、アプリを変えたのに版が上がっていないものを、ここで止める。
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# 既定の権限は読み取りだけ。Release を作るジョブだけ、書き込みを許す。
+# 作るのは master の push と、master からの手動実行だけ（ほかのブランチからの手動実行では、Release を作らない）。
+permissions:
+  contents: read
+
+jobs:
+  version-check:
+    name: Version bump check
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a new version when the app changed
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content -Raw -Encoding UTF8 src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $tag = "v$version"
+          git fetch --tags --quiet
+          $exists = git tag --list $tag
+          $changed = git diff --name-only "origin/${{ github.base_ref }}...HEAD" | Where-Object { $_ -match '^(src|installer|build)/' }
+          if ($exists -and $changed) {
+            Write-Host "::error::アプリを変更していますが、版（$version）のリリース（$tag）がすでにあります。FaraVrcPhotoServer.App.csproj の <Version> を上げてください。"
+            exit 1
+          }
+          Write-Host "版 ${version}（タグ ${tag}: $(if ($exists) { 'あり' } else { 'まだ無い' })）。アプリの変更: $(@($changed).Count) ファイル"
+
+  release:
+    name: Build installer and publish Release
+    # master への push と、master からの手動実行だけ。pull_request（確認）では動かさない
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Read the version
+        id: ver
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content -Raw -Encoding UTF8 src/FaraVrcPhotoServer.App/FaraVrcPhotoServer.App.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "版が x.y.z の形ではありません: $version" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Skip when the release already exists
+        id: exists
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.ver.outputs.tag }}" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "::warning::${{ steps.ver.outputs.tag }} の Release はすでにあります。版を上げていないので、新しい Release は作りません。"
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Test
+        if: steps.exists.outputs.exists == 'false'
+        run: dotnet test --nologo
+
+      - name: Install Inno Setup
+        if: steps.exists.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          # 版を 6.7.0 に固定する（Chocolatey に 6.7.0 があることを確かめ、開発機と同じ版にそろえた）。上げるときは、ここを直す
+          if (-not (Test-Path $iscc)) { choco install innosetup --version=6.7.0 --no-progress -y }
+
+      - name: Build the installer
+        if: steps.exists.outputs.exists == 'false'
+        shell: pwsh
+        run: ./build/publish.ps1
+
+      - name: Release notes
+        if: steps.exists.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          $previous = git tag --list 'v*' --sort=-v:refname | Where-Object { $_ -ne "${{ steps.ver.outputs.tag }}" } | Select-Object -First 1
+          ./build/release-notes.ps1 -Version "${{ steps.ver.outputs.version }}" -PreviousTag "$previous" | Out-File -Encoding utf8 release-notes.md
+          Get-Content release-notes.md
+
+      - name: Create the Release
+        if: steps.exists.outputs.exists == 'false'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" "dist/FaraVRCPhotoServer-Setup-${{ steps.ver.outputs.version }}.exe" `
+            --target "${{ github.sha }}" `
+            --title "FaraVRCPhotoServer ${{ steps.ver.outputs.tag }}" `
+            --notes-file release-notes.md
