@@ -19,7 +19,7 @@ public enum PhotoOutcome
     /// <summary>XMP に追記した。</summary>
     Written,
 
-    /// <summary>すでに faraxml の項目があるので、何もしなかった。</summary>
+    /// <summary>すでにアバターの項目（faratag、または旧形式の faraxml）があるので、何もしなかった。</summary>
     AlreadyTagged,
 
     /// <summary>撮影日時の直前のアバターが、履歴に無い。何も書かない。</summary>

@@ -9,22 +9,30 @@ namespace FaraVrcPhotoServer;
 public sealed record FaraXmlInfo(string AvatarName, string? AvatarId, string Source = "log");
 
 /// <summary>
-/// 写真の XMP（PNG の iTXt チャンク「XML:com.adobe.xmp」）に、独自の名前空間 faraxml の項目を足す・読む。
-/// 足すときは、元の XMP の文字列は 1 文字も変えず、閉じタグ <c>&lt;/rdf:RDF&gt;</c> の直前に 1 つの <c>rdf:Description</c> を挿入するだけ。
-/// すでに faraxml の項目がある写真は、何もしない（書き換えない）。XMP が無い写真は、最小の XMP を新しく作る。
+/// 写真の XMP（PNG の iTXt チャンク「XML:com.adobe.xmp」）に、独自の名前空間 faratag の項目を足す・読む。
+/// 足すときは、元の XMP の文字列は 1 文字も変えず、閉じタグ <c>&lt;/rdf:RDF&gt;</c> の直前に、<b>1 つの rdf:Description（子要素 AvatarName・AvatarID・Source・Version）</b>を挿入するだけ。
+/// すでにアバターの項目（faratag、または v1.0.0 の旧形式 faraxml）がある写真は、何もしない（書き換えない）。XMP が無い写真は、最小の XMP を新しく作る。
 /// </summary>
 public static partial class FaraXml
 {
-    public const string Namespace = "http://fara-labs.com/ns/faraxml/1.0/";
-    public const string Prefix = "faraxml";
+    public const string Namespace = "http://fara-labs.com/ns/faratag/1.0/";
+    public const string Prefix = "faratag";
     public const string XmpKeyword = "XML:com.adobe.xmp";
-    public const string Version = "1";
+
+    /// <summary>形式の版。旧形式（faraxml。v1.0.0）は 1、この形式（faratag）は 2。</summary>
+    public const string Version = "2";
+
+    /// <summary>v1.0.0 の旧形式（rdf:Description の属性 faraxml:AvatarName など）。読む・「すでに書いてある」と判定するためだけに残す。新しくは書かない。</summary>
+    public const string LegacyNamespace = "http://fara-labs.com/ns/faraxml/1.0/";
+
+    public const string LegacyPrefix = "faraxml";
 
     /// <summary>項目の値の上限（異常に長い名前を写真に入れない）。</summary>
     public const int MaxValueLength = 200;
 
-    /// <summary>XMP の文字列に、faraxml の名前空間が使われているか。</summary>
-    public static bool Has(string xmp) => xmp.Contains(Namespace, StringComparison.Ordinal);
+    /// <summary>XMP の文字列に、アバターの項目の名前空間（faratag、または旧形式の faraxml）が使われているか。</summary>
+    public static bool Has(string xmp) =>
+        xmp.Contains(Namespace, StringComparison.Ordinal) || xmp.Contains(LegacyNamespace, StringComparison.Ordinal);
 
     /// <summary>アバターの情報を足した XMP。すでにある（<see cref="Has"/>）・差し込み先が見つからないときは null。xmp が null なら、新しい XMP。</summary>
     public static string? AddTo(string? xmp, FaraXmlInfo info)
@@ -41,34 +49,44 @@ public static partial class FaraXml
         return xmp[..close] + description + "\n  " + xmp[close..];
     }
 
-    /// <summary>XMP から faraxml の項目を読む（属性でも子要素でも。無ければ null）。</summary>
+    /// <summary>XMP からアバターの項目を読む（faratag の子要素。旧形式 faraxml の属性・子要素も読む。無ければ null）。</summary>
     public static FaraXmlInfo? Read(string xmp)
     {
         if (!Has(xmp)) return null;
         var name = Find(xmp, "AvatarName");
         if (string.IsNullOrWhiteSpace(name)) return null;
-        return new FaraXmlInfo(name, Find(xmp, "AvatarId"), Find(xmp, "Source") ?? "");
+        return new FaraXmlInfo(name, Find(xmp, "AvatarID") ?? Find(xmp, "AvatarId"), Find(xmp, "Source") ?? "");
     }
 
+    /// <summary>項目の値。新しい名前空間（faratag）を先に、なければ旧形式（faraxml）を探す。子要素でも属性でも読む。</summary>
     private static string? Find(string xmp, string local)
     {
-        var attribute = Regex.Match(xmp, $@"\b{Prefix}:{local}=""(?<v>[^""]*)""");
-        if (attribute.Success) return Unescape(attribute.Groups["v"].Value);
-        var element = Regex.Match(xmp, $@"<{Prefix}:{local}>(?<v>[^<]*)</{Prefix}:{local}>");
-        return element.Success ? Unescape(element.Groups["v"].Value) : null;
+        foreach (var prefix in new[] { Prefix, LegacyPrefix })
+        {
+            var element = Regex.Match(xmp, $@"<{prefix}:{local}>(?<v>[^<]*)</{prefix}:{local}>");
+            if (element.Success) return Unescape(element.Groups["v"].Value);
+            var attribute = Regex.Match(xmp, $@"\b{prefix}:{local}=""(?<v>[^""]*)""");
+            if (attribute.Success) return Unescape(attribute.Groups["v"].Value);
+        }
+        return null;
     }
 
     private static string Unescape(string value) =>
         value.Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"").Replace("&apos;", "'").Replace("&amp;", "&");
 
+    /// <summary>
+    /// 追記する rdf:Description。子要素は、AvatarName・AvatarID（分かったときだけ）・Source・Version の順。
+    /// <code>&lt;rdf:Description xmlns:faratag="…"&gt;&lt;faratag:AvatarName&gt;…&lt;/faratag:AvatarName&gt; …</code>
+    /// </summary>
     private static string BuildDescription(FaraXmlInfo info)
     {
         var builder = new StringBuilder();
-        builder.Append($"    <rdf:Description xmlns:{Prefix}=\"{Namespace}\"");
-        builder.Append($" {Prefix}:Version=\"{Version}\"");
-        builder.Append($" {Prefix}:AvatarName=\"{Escape(Limit(info.AvatarName))}\"");
-        if (!string.IsNullOrWhiteSpace(info.AvatarId)) builder.Append($" {Prefix}:AvatarId=\"{Escape(Limit(info.AvatarId))}\"");
-        builder.Append($" {Prefix}:Source=\"{Escape(Limit(info.Source))}\"/>");
+        builder.Append($"    <rdf:Description xmlns:{Prefix}=\"{Namespace}\">\n");
+        builder.Append($"      <{Prefix}:AvatarName>{Escape(Limit(info.AvatarName))}</{Prefix}:AvatarName>\n");
+        if (!string.IsNullOrWhiteSpace(info.AvatarId)) builder.Append($"      <{Prefix}:AvatarID>{Escape(Limit(info.AvatarId))}</{Prefix}:AvatarID>\n");
+        builder.Append($"      <{Prefix}:Source>{Escape(Limit(info.Source))}</{Prefix}:Source>\n");
+        builder.Append($"      <{Prefix}:Version>{Version}</{Prefix}:Version>\n");
+        builder.Append("    </rdf:Description>");
         return builder.ToString();
     }
 

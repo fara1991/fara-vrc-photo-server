@@ -85,7 +85,7 @@ public sealed class PhotoTests : IDisposable
         XDocument.Parse(xmp);                                                                             // XML として正しい
         var read = FaraXml.Read(xmp)!;
         Assert.Equal(("FaraFrillBlood", "avtr_71bd1202-157a-4264-b888-a133209de9ca", "log"), (read.AvatarName, read.AvatarId, read.Source));
-        Assert.Contains("faraxml:Version=\"1\"", xmp);
+        Assert.Contains("<faratag:Version>2</faratag:Version>", xmp);
         Assert.Equal(PngFile.Parse(before).PixelData(), PngFile.Parse(after).PixelData());                // 画素は同じ
         Assert.Equal(stamp, File.GetLastWriteTimeUtc(path));                                              // 更新日時は元のまま
         Assert.Empty(Directory.EnumerateFiles(_root, "*" + PhotoXmpWriter.TempSuffix));                   // 一時ファイルは残らない
