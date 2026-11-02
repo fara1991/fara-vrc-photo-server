@@ -11,7 +11,8 @@
 AppId={{B8A4F5E2-3C1D-4E7A-9A56-7D2F1C0E8B34}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppVerName={#AppName} {#AppVersion}
+; 「アプリ」の一覧に出る名前。バージョンは付けない（バージョンは、別の欄に出る）
+AppVerName={#AppName}
 AppPublisher=Fara
 AppPublisherURL=https://github.com/fara1991/fara-vrc-photo-server
 AppSupportURL=https://github.com/fara1991/fara-vrc-photo-server/issues
