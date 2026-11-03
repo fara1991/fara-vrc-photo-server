@@ -34,7 +34,7 @@ public sealed class LogAndHistoryTests : IDisposable
     {
         var events = Parse(Me,
             Line("01:49:39", "[Behaviour] Entering Room: Crystal Garden"),
-            Line("01:49:39", $"[Behaviour] Joining {World}:49024~private(usr_49161266-8b29-4a76-be2a-0e9773ebd8af)~region(jp)"));
+            Line("01:49:39", $"[Behaviour] Joining {World}:49024~private(usr_00000000-0000-0000-0000-000000000000)~region(jp)"));
 
         var world = Assert.Single(events);
         Assert.Equal(HistoryEventTypes.World, world.Type);
